@@ -9,46 +9,46 @@ App::Console_t::Console_t(Memory a, Handle s, Hwnd w) :
 {}
 App::Console_t::~Console_t()
 {}
-Procedure App::Console_t::pReserved(Memory a, Memory b, Memory c)
+void App::Console_t::pReserved(Memory a, Memory b, Memory c)
 {
-	this->pParent = a;
-	this->hStream = static_cast<Handle>(b);
-	this->hWnd = static_cast<Hwnd>(c);
-	this->bGood = a != NULL && c != NULL;
+	pParent = a;
+	hStream = static_cast<Handle>(b);
+	hWnd = static_cast<Hwnd>(c);
+	bGood = a != NULL && c != NULL;
 }
 Bool App::Console_t::Missing()const
 {
 	return this->pParent == NULL ||
 		this->hStream == NULL || this->hWnd == NULL;
 }
-BOOL __stdcall RemoteVoidProcedureThread(Reserved::lpBOOLStruct data)
+BOOL __stdcall RemoteVoidProcedureThread(Reserved::BOOLStruct* data)
 {
 	*(data->iExitCode) = ((Reserved::BOOLProcedure)(data->dwAddr))();
 	return *(data->iExitCode);
 }
-BOOL __stdcall RemoteStringAProcedureThread(Reserved::lpLPCSTRStruct data)
+BOOL __stdcall RemoteStringAProcedureThread(Reserved::LPCSTRStruct* data)
 {
 	*(data->iExitCode) = ((Reserved::LPCSTRProcedure)(data->dwAddr))(data->pString);
 	return *(data->iExitCode);
 }
-BOOL __stdcall RemoteStringWProcedureThread(Reserved::lpLPCWSTRStruct data)
+BOOL __stdcall RemoteStringWProcedureThread(Reserved::LPCWSTRStruct* data)
 {
 	*(data->iExitCode) = ((Reserved::LPCWSTRProcedure)(data->dwAddr))(data->pString);
 	return *(data->iExitCode);
 }
-BOOL __stdcall RemoteDWORDProcedureThread(Reserved::lpDWORDStruct data)
+BOOL __stdcall RemoteDWORDProcedureThread(Reserved::DWORDStruct* data)
 {
 	*(data->iExitCode) = ((Reserved::DWORDProcedure)(data->dwAddr))(*data->dwParam);
 	return *(data->iExitCode);
 }
-BOOL __stdcall RemotePrintAProcedureThread(Reserved::lpPrintStructA data)
+BOOL __stdcall RemotePrintAProcedureThread(Reserved::PrintStructA* data)
 {
 	*(data->iExitCode) =
 		((Reserved::PrintProcedureA)(data->dwAddr))(data->hStream, data->sOut,
 			*data->dwWrite, *data->dwWritten, NULL);
 	return *(data->iExitCode);
 }
-BOOL __stdcall RemotePrintWProcedureThread(Reserved::lpPrintStructW data)
+BOOL __stdcall RemotePrintWProcedureThread(Reserved::PrintStructW* data)
 {
 	*(data->iExitCode) = ((Reserved::PrintProcedureW)(data->dwAddr))(data->hStream, data->sOut,
 		*data->dwWrite, *data->dwWritten, NULL);
@@ -62,13 +62,12 @@ BOOL __stdcall RemotePrintWProcedureThread(Reserved::lpPrintStructW data)
 #define RemoteGetStdHandleThread     RemoteDWORDProcedureThread
 #define RemoteWriteConsoleAThread    RemotePrintAProcedureThread
 #define RemoteWriteConsoleWThread    RemotePrintWProcedureThread
-BOOL P_ENTRY App::Console_t::Create()
+BOOL PE_CALL App::Console_t::Create()
 {
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
 	{
-		setLastErrorNum(PIE_ERROR_INVALID_CALL);
-		return 0;
+		return FALSE;
 	}
 	BOOL bSuccess = app->InjectVoidFunction("AllocConsole", "kernel32.dll",
 		RemoteAllocConsoleThread);
@@ -82,153 +81,144 @@ BOOL P_ENTRY App::Console_t::Create()
 	this->UpdateHandle();
 	return bSuccess;
 }
-BOOL P_ENTRY App::Console_t::Create(const SuperAnsiString& sCaption)
+BOOL PE_CALL App::Console_t::Create(cStringA sCaption)
 {
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
 	{
-		setLastErrorNum(PIE_ERROR_INVALID_CALL);
-		return 0;
-	}
-	BOOL bSuccess = app->InjectVoidFunction("AllocConsole", "kernel32.dll",
-		RemoteAllocConsoleThread);
-	if (bSuccess != FALSE)
-	{
-		this->UpdateHandle();
-		this->hWnd = (Hwnd)app->InjectVoidFunction("GetConsoleWindow", "kernel32.dll",
-			RemoteGetConsoleWindowThread);
-		bSuccess = static_cast<BOOL>(HandleGood(this->hWnd));
-	}
-	this->bGood = HandleGood(this->hWnd);
-	if (bSuccess && sCaption.Good())
-	{
-		return this->SetTitle(sCaption);
-	}
-	return FALSE;
-}
-BOOL P_ENTRY App::Console_t::Create(const SuperUnicodeString& sCaption)
-{
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
-	{
-		setLastErrorNum(PIE_ERROR_INVALID_CALL);
-		return 0;
-	}
-	BOOL bSuccess = app->InjectVoidFunction("AllocConsole", "kernel32.dll",
-		RemoteAllocConsoleThread);
-	if (bSuccess != FALSE)
-	{
-		this->hWnd = (Hwnd)app->InjectVoidFunction("GetConsoleWindow", "kernel32.dll",
-			RemoteGetConsoleWindowThread);
-		bSuccess = static_cast<BOOL>(HandleGood(this->hWnd));
-	}
-	this->bGood = HandleGood(this->hWnd);
-	if (bSuccess && sCaption.Good())
-	{
-		this->UpdateHandle();
-		bSuccess = app->InjectStringFunctionW("SetConsoleTitleW", "kernel32.dll",
-			RemoteSetConsoleWThread, sCaption.c_str());
-		return this->SetTitle(sCaption);
-	}
-	return FALSE;
-}
-BOOL P_ENTRY App::Console_t::SetTitle(const SuperAnsiString& sCaption)
-{
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
-	{
-		setLastErrorNum(PIE_ERROR_INVALID_CALL);
 		return FALSE;
 	}
-	if (sCaption.Good())
+	BOOL bSuccess = app->InjectVoidFunction("AllocConsole", "kernel32.dll",
+		RemoteAllocConsoleThread);
+	if (bSuccess != FALSE)
+	{
+		UpdateHandle();
+		hWnd = (Hwnd)app->InjectVoidFunction("GetConsoleWindow", "kernel32.dll",
+			RemoteGetConsoleWindowThread);
+		bSuccess = static_cast<BOOL>(HandleGood(hWnd));
+	}
+	bGood = HandleGood(hWnd);
+	if (bSuccess && sCaption)
+	{
+		return SetTitle(sCaption);
+	}
+	return FALSE;
+}
+BOOL PE_CALL App::Console_t::Create(cStringW sCaption)
+{
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
+	{
+		return FALSE;
+	}
+	BOOL bSuccess = app->InjectVoidFunction("AllocConsole", "kernel32.dll",
+		RemoteAllocConsoleThread);
+	if (bSuccess != FALSE)
+	{
+		hWnd = (Hwnd)app->InjectVoidFunction("GetConsoleWindow", "kernel32.dll",
+			RemoteGetConsoleWindowThread);
+		bSuccess = static_cast<BOOL>(HandleGood(hWnd));
+	}
+	bGood = HandleGood(hWnd);
+	if (bSuccess && sCaption)
+	{
+		UpdateHandle();
+		return SetTitle(sCaption);
+	}
+	return FALSE;
+}
+BOOL PE_CALL App::Console_t::SetTitle(cStringA sCaption)
+{
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
+	{
+		return FALSE;
+	}
+	if (sCaption)
 	{
 		return app->InjectStringFunctionA("SetConsoleTitleA", "kernel32.dll",
-			RemoteSetConsoleAThread, sCaption.c_str());
+			RemoteSetConsoleAThread, sCaption);
 	}
-	app->SetLastError(PIE_ERROR_INVALID_CALL,
+	app->SetLastError(ERROR_INVALID_HANDLE,
 		"No active console found");
 	return FALSE;
 }
-BOOL P_ENTRY App::Console_t::SetTitle(const SuperUnicodeString& sCaption)
+BOOL PE_CALL App::Console_t::SetTitle(cStringW sCaption)
 {
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
 	{
-		setLastErrorNum(PIE_ERROR_INVALID_CALL);
 		return FALSE;
 	}
-	if (sCaption.Good())
+	if (sCaption)
 	{
 		return app->InjectStringFunctionW("SetConsoleTitleW", "kernel32.dll",
-			RemoteSetConsoleWThread, sCaption.c_str());
+			RemoteSetConsoleWThread, sCaption);
 	}
-	app->SetLastError(PIE_ERROR_INVALID_CALL,
+	app->SetLastError(ERROR_INVALID_HANDLE,
 		"No active console found");
 	return FALSE;
 }
-BOOL P_ENTRY App::Console_t::Destroy()
+BOOL PE_CALL App::Console_t::Destroy()
 {
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
 	{
-		setLastErrorNum(PIE_ERROR_INVALID_CALL);
 		return FALSE;
 	}
 	if (app->InjectVoidFunction("FreeConsole", "kernel32.dll",
 		RemoteFreeConsoleThread))
 	{
-		this->hWnd = NULL;
-		this->hStream = NULL;
-		this->bGood = false;
+		hWnd = NULL;
+		hStream = NULL;
+		bGood = false;
 		return TRUE;
 	}
 	return FALSE;
 }
-BOOL P_ENTRY App::Console_t::Write(const SuperAnsiString& sData)
+BOOL PE_CALL App::Console_t::Write(cStringA sData)
 {
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
 	{
-		setLastErrorNum(PIE_ERROR_INVALID_CALL);
 		return FALSE;
 	}
-	if (sData.Good())
+	if (sData)
 	{
 		return app->InjectPrintFunctionA("WriteConsoleA", "kernel32.dll",
-			RemoteWriteConsoleAThread, this->hStream, sData, NULL);
+			RemoteWriteConsoleAThread, hStream, sData, NULL);
 	}
-	app->SetLastError(PIE_ERROR_INVALID_CALL,
+	app->SetLastError(ERROR_INVALID_HANDLE,
 		"No active console found");
 	return FALSE;
 }
-BOOL P_ENTRY App::Console_t::Write(const SuperUnicodeString& sData)
+BOOL PE_CALL App::Console_t::Write(cStringW sData)
 {
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
 	{
-		setLastErrorNum(PIE_ERROR_INVALID_CALL);
 		return FALSE;
 	}
-	if (sData.Good())
+	if (sData)
 	{
 		return app->InjectPrintFunctionW("WriteConsoleW", "kernel32.dll",
-			RemoteWriteConsoleWThread, this->hStream, sData, NULL);
+			RemoteWriteConsoleWThread, hStream, sData, NULL);
 	}
-	app->SetLastError(PIE_ERROR_INVALID_CALL,
+	app->SetLastError(ERROR_INVALID_HANDLE,
 		"No active console found");
 	return FALSE;
 }
-Procedure App::Console_t::UpdateHandle()
+void App::Console_t::UpdateHandle()
 {
-	if (this->hWnd == NULL)
+	if (hWnd == NULL)
 		return;
-	App* app = static_cast<App*>(this->pParent);
-	if (app == PIE_NULL(App))
+	App* app = static_cast<App*>(pParent);
+	if (app == PE_NULL(App))
 	{
 		return;
 	}
-	this->hStream = (Handle)app->InjectDWORDFunction(
+	hStream = (Handle)app->InjectDWORDFunction(
 		"GetStdHandle", "kernel32.dll",
 		RemoteGetStdHandleThread, STD_OUTPUT_HANDLE);
-	this->bGood = HandleGood(this->hStream);
+	bGood = HandleGood(hStream);
 }

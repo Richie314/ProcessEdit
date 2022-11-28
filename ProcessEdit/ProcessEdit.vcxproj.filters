@@ -33,6 +33,9 @@
     <ClInclude Include="PE_Strings.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
+    <ClInclude Include="PE_Definitions.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -56,7 +59,19 @@
     <ClCompile Include="PE_App_Inject.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
-    <ClCompile Include="PE_Strings.cpp">
+    <ClCompile Include="PE_Strings_ANSI.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="PE_App_Inject_Generic.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="PE_App_Hook.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="PE_App_Libraries.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="PE_Strings_UNICODE.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
   </ItemGroup>

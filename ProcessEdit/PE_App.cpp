@@ -1,28 +1,25 @@
 #include "pch.h"
 #include "PE_App.h"
 #include <Psapi.h>
+#include <utility>
+#include <vector>
 using namespace pe;
-void App::SetLastError(Uint error,
-	const StringA& errorStr)
-{
-	this->__LastError = error;
 
-	this->__LastErrorStr = errorStr;
-}
-Bool isValidProgramStr(const StringW& str)
+Bool isValidProgramStr(cStringW& name)
 {
-	if (str::ContainsW(L'.'))
+	Int32 indexOfDot = str::LastIndexOfW(name, L'.');
+	if (indexOfDot != EOF)
 	{
-		auto _end = str.substr(str.lastIndexOf(L'.'), str.size);
-		return (_end == L".exe" || _end == L".dll");
+		cStringW _end = str::SinceW(name, indexOfDot);
+		return str::EqualsW(_end, L".exe") || str::EqualsW(_end, L".dll");
 	}
 	return false;
 }
 
-template <class A, Bool b>
 void GetAllWindowsFromProcessID(
-	DWORD dwProcessID, SuperArray<Hwnd, A, b>& vhWnds)
+	DWORD dwProcessID, Array<Hwnd>& vhWnds)
 {
+	std::vector<Hwnd> v;
 	Hwnd hCurWnd = NULL;
 	do
 	{
@@ -31,183 +28,223 @@ void GetAllWindowsFromProcessID(
 		GetWindowThreadProcessId(hCurWnd, &dwProcID);
 		if (dwProcID == dwProcessID)
 		{
-			vhWnds.push_back(hCurWnd);
+			v.push_back(hCurWnd);
 		}
 	} while (hCurWnd != NULL);
+	vhWnds.DeAllocate();
+	vhWnds.Allocate(v.size());
+	if (vhWnds.addr)
+		memcpy_s(
+			vhWnds.addr, sizeof(Hwnd) * vhWnds.count,
+			&v[0], sizeof(Hwnd) * v.size());
 }
-
+void App::SetLastError(Uint error,
+	 cStringA errorStr)
+{
+	this->__LastError = error;
+	str::CopyA(&this->__LastErrorStr, errorStr);
+}
 
 App::App()
 	:hProc(INVALID_HANDLE_VALUE),
 	hToken(INVALID_HANDLE_VALUE),
 	pId(0),
-	__LastError(PIE_ERROR_NOERROR),
-	__LastErrorTime(0),
+	__LastError(0),
 	dispose(true)
 {
 	this->ListLibraries();
 };
-App::App(const SuperUnicodeString& sProcess, Bool canWrite)
+App::App(cStringW sProcess, Bool canWrite)
 	:hProc(INVALID_HANDLE_VALUE),
 	hToken(INVALID_HANDLE_VALUE),
 	pId(0),
-	__LastError(PIE_ERROR_NOERROR),
-	__LastErrorTime(0),
+	__LastError(0),
 	dispose(true)
 {
 	if (!isValidProgramStr(sProcess))
 		return;
-	auto sP = sProcess.replace(L'/', L'\\');
-	if (sProcess.contains('\\'))
+	StringW sProcessEdit;
+	str::CopyW(&sProcessEdit, sProcess);
+	str::ReplaceW(sProcessEdit, L'/', L'\\');
+	if (str::ContainsW(sProcessEdit, L'\\'))
 	{
-		Int32 index = sP.lastIndexOf(L'\\') + 1;
-		this->sLocation = sP.substr(0, index);
-		this->sName = sP.substr(index, sP.size);
+		size_t index = str::LastIndexOfW(sProcessEdit, L'\\') + 1U;
+		str::CopyW(&sLocation, sProcessEdit, index);
+		str::CopyW(&sName, str::SinceW(sProcessEdit, index));
 	}
-	this->pId = this->FindProcId();
-	this->OpenStreamProcess(canWrite);
-	this->UpdateWindowCount();
-	this->ListLibraries();
+	pId = FindProcId();
+	OpenStreamProcess(canWrite);
+	UpdateWindowCount();
+	ListLibraries();
 };
 App::App(Dword PID, Bool canWrite)
 	:hProc(INVALID_HANDLE_VALUE),
 	hToken(INVALID_HANDLE_VALUE),
 	pId(0),
-	__LastError(PIE_ERROR_NOERROR),
-	__LastErrorTime(0),
+	__LastError(0),
 	dispose(true)
 {
-	this->OpenProcessFromID(PID, canWrite);
-	this->UpdateWindowCount();
-	this->ListLibraries();
+	OpenProcessFromID(PID, canWrite);
+	UpdateWindowCount();
+	ListLibraries();
 };
 App::App(const ProcessBasicInfo& pbiInfo, Bool canWrite)
 	:hProc(INVALID_HANDLE_VALUE),
 	hToken(INVALID_HANDLE_VALUE),
 	pId(0),
-	__LastError(PIE_ERROR_NOERROR),
-	__LastErrorTime(0),
+	__LastError(0),
 	dispose(true)
 {
-	this->OpenProcessFromID(pbiInfo.dwId, canWrite);
-	this->UpdateWindowCount();
-	this->ListLibraries();
+	OpenProcessFromID(pbiInfo.dwId, canWrite);
+	UpdateWindowCount();
+	ListLibraries();
 };
 App::App(const pProcessBasicInfo pPBI, Bool canWrite)
 	:hProc(INVALID_HANDLE_VALUE),
 	hToken(INVALID_HANDLE_VALUE),
 	pId(0),
-	__LastError(PIE_ERROR_NOERROR),
-	__LastErrorTime(0),
+	__LastError(0),
 	dispose(true)
 {
-	if (pPBI != PIE_NULL(ProcessBasicInfo))
+	if (pPBI)
 	{
-		this->OpenProcessFromID(pPBI->dwId, canWrite);
-		this->UpdateWindowCount();
+		OpenProcessFromID(pPBI->dwId, canWrite);
+		UpdateWindowCount();
 	}
-	this->SetLastError(PIE_ERROR_INVALID_PID | PIE_ERROR_INVALID_PARAM,
+	SetLastError(0,
 		"Trying to initialize with a NULL pointer: expected a \"ProcessBasicInfo\" pointer.");
-	this->ListLibraries();
+	ListLibraries();
 };
-App::App(App& otherApp)
+App::App(const App& otherApp)
 	:hProc(INVALID_HANDLE_VALUE),
 	hToken(INVALID_HANDLE_VALUE),
 	pId(0),
-	__LastError(PIE_ERROR_NOERROR),
-	__LastErrorTime(0),
-	dispose(true),
-	ListLoadedLibraries(otherApp.ListLoadedLibraries)
+	__LastError(0),
+	dispose(true)
 {
-	this->fromOtherStream(otherApp);
+	fromOtherStream(otherApp);
+}
+App::App(App&& otherApp)
+	:hProc(INVALID_HANDLE_VALUE),
+	hToken(INVALID_HANDLE_VALUE),
+	pId(0),
+	__LastError(0),
+	dispose(true)
+{
+	fromOtherStream(std::move(otherApp));
 }
 App::~App()
 {
-	this->Close();
+	Close();
 }
 
-Procedure App::Close()
+void App::Close()
 {
-	if (this->dispose)
+	if (dispose)
 	{
-		if (HandleGood(this->hProc))
-			CloseHandle(this->hProc);
-		if (HandleGood(this->hToken))
-			CloseHandle(this->hToken);
+		if (HandleGood(hProc))
+			CloseHandle(hProc);
+		if (HandleGood(hToken))
+			CloseHandle(hToken);
 	}
-	this->hwnds.clear();
-	this->sLocation.clear();
-	this->sName.clear();
-	this->sUser.clear();
-	this->__LastErrorStr.clear();
-	this->dispose = false;
-	this->pId = 0;
-	this->ListLoadedLibraries.clear();
+	hwnds.DeAllocate();
+	str::FreeW(&sLocation, 0);
+	str::FreeW(&sName, 0);
+	str::FreeW(&sUser, 0);
+	str::FreeA(&__LastErrorStr, 0);
+	dispose = false;
+	pId = 0;
 }
 
-Hwnd App::FindThisWindowFromContent(const SuperUnicodeString& caption)const
+Hwnd App::FindThisWindowFromContent(cStringW caption)const
 {
-	for (Hwnd hwnd : this->hwnds)
+	StringW s;
+	size_t size = str::LenW(caption);
+	if (!size)
+		return NULL;
+	if (!str::AllocW(&s, size))
+		return NULL;
+	Hwnd curr = NULL;
+	for (size_t i = 0; i < hwnds.count; ++i)
 	{
-		if (GetWindowTextSW(hwnd) == caption)
-			return hwnd;
+		if (GetWindowTextW(hwnds[i], s, size + 1U))
+		{
+			if (str::EqualsW(s, caption))
+			{
+				curr = hwnds[i];
+				break;
+			}
+		}
 	}
-	return NULL;
+	str::FreeW(&s, size);
+	return curr;
 }
-Hwnd App::FindThisWindowFromContent(const SuperAnsiString& caption)const
+Hwnd App::FindThisWindowFromContent(cStringA caption)const
 {
-	for (Hwnd hwnd : this->hwnds)
+	StringA s;
+	size_t size = str::LenA(caption);
+	if (!size)
+		return NULL;
+	if (!str::AllocA(&s, size))
+		return NULL;
+	Hwnd curr = NULL;
+	for (size_t i = 0; i < hwnds.count; ++i)
 	{
-		if (GetWindowTextSA(hwnd) == caption)
-			return hwnd;
+		if (GetWindowTextA(hwnds[i], s, size + 1U))
+		{
+			if (str::EqualsA(s, caption))
+			{
+				curr = hwnds[i];
+				break;
+			}
+		}
 	}
-	return NULL;
+	str::FreeA(&s, size);
+	return curr;
 }
 
-Procedure App::ExtractTokenInfo()
+void App::ExtractTokenInfo()
 {
 	Dword dwProcessTokenInfoAllocSize = 0, error = 0;
-	GetTokenInformation(this->hToken, TokenUser,
+	GetTokenInformation(hToken, TokenUser,
 		NULL, 0, &dwProcessTokenInfoAllocSize);
 	error = GetLastError();
 	if (error == ERROR_ACCESS_DENIED)
 	{
-		this->SetLastError(PIE_ERROR_ACCESSERROR,
+		SetLastError(ERROR_ACCESS_DENIED,
 			"GetTokenInformation failed with error: ACCESS_DENIED");
 		return;
 	}
-	else if (error == ERROR_INSUFFICIENT_BUFFER)
+	if (error == ERROR_INSUFFICIENT_BUFFER)
 	{
-		PTOKEN_USER pUserToken = reinterpret_cast<PTOKEN_USER>
-			(Heap.Create(dwProcessTokenInfoAllocSize));
+		PTOKEN_USER pUserToken = new TOKEN_USER;
 		if (pUserToken == NULL)
 		{
-			this->SetLastError(PIE_ERROR_MEMORY_ERROR,
+			SetLastError(ERROR_INSUFFICIENT_BUFFER,
 				"Not enough space");
 			return;
 		}
 		if (!GetTokenInformation(
-			this->hToken,
+			hToken,
 			TokenUser, pUserToken,
 			dwProcessTokenInfoAllocSize,
 			&dwProcessTokenInfoAllocSize))
 		{
 			if (GetLastError() == ERROR_ACCESS_DENIED)
-				this->SetLastError(PIE_ERROR_ACCESSERROR,
+				SetLastError(ERROR_ACCESS_DENIED,
 					"GetTokenInformation failed with error: ACCESS_DENIED");
 			else
-				this->SetLastError(PIE_ERROR_ACCESSERROR,
+				SetLastError(ERROR_ACCESS_DENIED,
 					"GetTokenInformation failed with unknown error");
-
-			Heap.Destroy(pUserToken);
+			delete pUserToken;
 			return;
 		}
 		SID_NAME_USE   snuSIDNameUse;
-		wchar_t szUser[256];
-		memset(szUser, 0, 512);
+
+		wchar_t szUser[256] = { 0 };
 		Dword dwUserNameLength = 256;
-		wchar_t szDomain[256];
-		memset(szUser, 0, 512);
+
+		wchar_t szDomain[256] = { 0 };
 		Dword dwDomainNameLength = 256;
 		if (LookupAccountSidW(NULL,
 			pUserToken->User.Sid,
@@ -215,426 +252,326 @@ Procedure App::ExtractTokenInfo()
 			szDomain, &dwDomainNameLength,
 			&snuSIDNameUse))
 		{
-			this->sUser = L"\\\\";
-			this->sUser += szDomain;
-			this->sUser += L"\\";
-			this->sUser += szUser;
+			str::ReAllocW(&sUser, 3 + str::Len(szDomain) + str::Len(szUser));
+			str::CatW(sUser, L"\\\\");
+			str::CatW(sUser, szDomain);
+			str::CatW(sUser, L"\\\\");
+			str::CatW(sUser, szUser);
 		}
-		Heap.Destroy(pUserToken);
+		delete pUserToken;
 	}
 }
 
-Procedure App::UpdateWindowCount()
+void App::UpdateWindowCount()
 {
-	if (this->Good())
-		GetAllWindowsFromProcessID(this->pId, this->hwnds);
+	if (Good())
+		GetAllWindowsFromProcessID(pId, hwnds);
 }
 
-const SuperByteArray App::ReadMemory(const Memory addr, Uint size)const
+Bool App::ReadMemory(
+	const Memory addr, Uint bytesToRead,
+	Memory* destination)const
 {
-	if (addr == 0 || size == 0 || (!this->Good()))
-		return std::move(SuperByteArray());
-	Memory buff = Heap.Create(size);
-	SIZE_T nbytesRead = 0;
-	if (ReadProcessMemory(this->hProc, addr, &buff, size, &nbytesRead))
-	{
-		SuperByteArray buffArray((Byte*)buff, nbytesRead);
-		Heap.Destroy(buff);
-		return std::move(buffArray);
-	}
-	return std::move(SuperByteArray());
-}
-
-Bool P_ENTRY App::WriteMemory(const Memory addr, const SuperByteArray& buffer)
-{
-	if ((!this->Good()) || addr == NULL || buffer.empty())
+	if (addr == NULL || destination == NULL ||bytesToRead == 0 || (!Good()))
 		return false;
-	SIZE_T nSize = buffer.size;
-	if (WriteProcessMemory(this->hProc, addr, buffer.begin(),
+	if (*destination == NULL)
+	{
+		return false;
+	}
+	SIZE_T nbytesRead = 0;
+	if (ReadProcessMemory(hProc, addr, destination, bytesToRead, &nbytesRead))
+	{
+		return true;
+	}
+	return false;
+}
+
+Bool PE_CALL App::WriteMemory(const Memory addr, const Memory buffer, size_t size)
+{
+	if ((!Good()) || addr == NULL || size == 0 || buffer == NULL)
+		return false;
+	SIZE_T nSize = size;
+	if (WriteProcessMemory(hProc, addr, buffer,
 		nSize, &nSize))
 	{
 		return true;
 	}
 	if (GetLastError() == ERROR_ACCESS_DENIED)
-		this->SetLastError(PIE_ERROR_ACCESSERROR,
+		SetLastError(ERROR_ACCESS_DENIED,
 			"WriteMemory: It appears the block requested was not accessible");
 	else
-		this->SetLastError(PIE_ERROR_ACCESSERROR,
+		SetLastError(ERROR_ACCESS_DENIED,
 			"WriteMemory: Operation failed with no specified error");
 	return false;
 }
-Bool P_ENTRY App::WriteMemory(const Memory addr, const SuperAnsiString& buffer)
-{
-	return this->WriteMemory(addr, std::move(
-		SuperByteArray((Byte*)buffer.begin(), buffer.size)));
-}
-Bool P_ENTRY App::WriteMemory(const Memory addr, const SuperUnicodeString& buffer)
-{
-	return this->WriteMemory(addr, std::move(
-		SuperByteArray((Byte*)buffer.begin(), 2 * buffer.size)));
-}
-Bool P_ENTRY App::WriteMemory(const Memory addr, const Memory buffer, size_t size)
-{
-	return this->WriteMemory(addr, std::move(
-		SuperByteArray((Byte*)buffer, size)));
-}
+
 
 Dword App::FindProcId()const
 {
-	PIDlist list = Pie_314::FindProcId(this->sName);
-	return ((list.empty()) ? (0) : (list.at(0)));
+	PIDList list = pe::FindProcId(sName);
+	Dword dwPID = 0;
+	if (list.count && list.addr)
+	{
+		dwPID = list[0];
+		list.DeAllocate();
+	}
+	return dwPID;
 }
 
-Procedure App::OpenStreamProcess(Bool bWrite)
+void App::OpenStreamProcess(Bool bWrite)
 {
-	if (this->pId != 0)
+	if (pId != 0)
 	{
-		this->hProc = OpenProcess(PROCESS_VM_READ |
+		hProc = OpenProcess(PROCESS_VM_READ |
 			PROCESS_QUERY_INFORMATION | PROCESS_SUSPEND_RESUME |
 			PROCESS_TERMINATE |
 			((bWrite) ? (PROCESS_VM_WRITE | PROCESS_VM_OPERATION) : 0),
 			FALSE, pId);
-		if (HandleBad(this->hProc))
+		if (HandleBad(hProc))
 		{
 			if (GetLastError() == ERROR_ACCESS_DENIED)
-				this->SetLastError(PIE_ERROR_ACCESSERROR,
+			{
+				SetLastError(ERROR_ACCESS_DENIED,
 					"OpenProcess failed with error: ACCESS_DENIED");
-			else
-				this->SetLastError(PIE_ERROR_HANDLE_ERROR,
-					"OpenProcess failed returning INVALID_HANDLE_VALUE");
+				return;
+			}
+			SetLastError(ERROR_INVALID_HANDLE,
+				"OpenProcess failed returning INVALID_HANDLE_VALUE");
 			return;
 		}
-		this->Aip.Init(this->hProc, &this->__LastError);
-		BOOL bToken = OpenProcessToken(this->hProc,
-			TOKEN_READ, &this->hToken);
-		if (!(bToken && HandleGood(this->hToken)))
+		BOOL bToken = OpenProcessToken(hProc,
+			TOKEN_READ, &hToken);
+		if (!(bToken && HandleGood(hToken)))
 		{
 			if (GetLastError() == ERROR_ACCESS_DENIED)
-				this->SetLastError(PIE_ERROR_ACCESSERROR,
+				SetLastError(ERROR_ACCESS_DENIED,
 					"OpenProcessToken failed with error: ACCESS_DENIED");
 			else
-				this->SetLastError(PIE_ERROR_HANDLE_ERROR,
+				SetLastError(ERROR_INVALID_HANDLE,
 					"OpenProcessToken returned INVALID_HANDLE_VALUE");
 			return;
 		}
-		this->ExtractTokenInfo();
+		ExtractTokenInfo();
 	}
 }
 
-Procedure App::OpenProcessFromID(Dword PID, Bool bWrite)
+void App::OpenProcessFromID(Dword PID, Bool bWrite)
 {
-	this->pId = PID;
-	if (this->pId == 0)
+	pId = PID;
+	if (pId == 0)
 	{
-		this->SetLastError(PIE_ERROR_INVALID_PID, "A PID cannot be 0");
+		SetLastError(0, "A PID cannot be 0");
 	}
 	this->OpenStreamProcess(bWrite);
 	this->sName = FindProcNameW(this->pId);
 }
 
-Procedure App::FindProcessName()
+void App::FindProcessName()
 {
 	if (!this->Good())
 	{
-		this->sLocation.clear();
-		this->sName.clear();
+		str::FreeW(&this->sLocation, 0);
+		str::FreeW(&this->sName, 0);
 		return;
 	}
-	SuperUnicodeString ret;
+	StringW ret;
 	Dword buffSize = 1024;
-	ret.resize(1024U);
-	if (QueryFullProcessImageNameW(this->hProc, 0,
-		ret.begin(), &buffSize))
+	str::AllocW(&ret, buffSize);
+	if (QueryFullProcessImageNameW(hProc, 0,
+		ret, &buffSize))
 	{
-		ret.resize(buffSize);
-		Int32 index = ret.lastIndexOf(L'\\');
+		str::ReAllocW(&ret, buffSize);
+		Int32 index = str::LastIndexOfW(ret, L'\\');
 		if (index != EOF)
 		{
-			this->sLocation = ret.substr(0, index + 1);
-			this->sName = ret.substr(index + 1, ret.size);
+			str::CopyW(&sLocation, ret, index + 1);
+			str::CopyW(&sName, str::SinceW(ret, index + 1));
 		}
 		else {
-			this->sName = ret;
+			str::CopyW(&sName, ret);
 		}
 	}
 	else {
-		this->sLocation.clear();
-		this->sName.clear();
+		str::FreeW(&sLocation, 0);
+		str::FreeW(&sName, 0);
 	}
-	ret.clear();
+	str::FreeW(&ret, 0);
 }
 
-SuperUnicodeString App::toStringW()const
+
+App& App::operator = (App&& app)
 {
-	if (this->Good())
-		return L"Process: " + this->sLocation + this->sName + L"\r\n" +
-		L"Owner:\t" + this->sUser + L"\r\n" +
-		L"PID:\t" + PrintDecW(this->pId) + L"\r\n" +
-		L"HANDLE:\t0x" + PrintHexW((size_t)this->hProc) + L"\r\n";
-	return L"Process not specified yet!";
-}
-SuperAnsiString App::toStringA()const
-{
-	return this->toStringW().forEach<char>([](wchar_t w) {
-		return static_cast<char>(w); });
+	return fromOtherStream(std::move(app));
 }
 
-App& App::operator=(App& app)
+App& App::fromOtherStream(App&& app)
 {
-	return this->fromOtherStream(app);
-}
-
-App& App::fromOtherStream(App& app)
-{
-	this->Close();
+	Close();
 	app.dispose = false;
-	this->dispose = true;
-	this->hProc = app.hProc;
-	this->hToken = app.hToken;
-	this->hwnds = app.hwnds;
-	this->pId = app.pId;
-	this->sLocation = app.sLocation;
-	this->sName = app.sName;
-	this->sUser = app.sUser;
-	this->__LastError = app.__LastError;
-	this->__LastErrorStr = app.__LastErrorStr;
-	this->__LastErrorTime = app.__LastErrorTime;
-	this->Aip.Init(this->hProc, &this->__LastError);
+	dispose = true;
+	hProc = app.hProc;
+	hToken = app.hToken;
+	hwnds.CopyFrom(app.hwnds);
+	pId = app.pId;
+	str::CopyW(&sLocation, app.sLocation);
+	str::CopyW(&sName, app.sName);
+	str::CopyW(&sUser, app.sUser);
+	__LastError = app.__LastError;
+	str::CopyA(&__LastErrorStr, app.__LastErrorStr);
+	return *this;
+}
+App& App::operator = (const App& app)
+{
+	return fromOtherStream(app);
+}
+
+App& App::fromOtherStream(const App& app)
+{
+	Close();
+	dispose = true;
+	hProc = app.hProc;
+	hToken = app.hToken;
+	hwnds.CopyFrom(app.hwnds);
+	pId = app.pId;
+	str::CopyW(&sLocation, app.sLocation);
+	str::CopyW(&sName, app.sName);
+	str::CopyW(&sUser, app.sUser);
+	__LastError = app.__LastError;
+	str::CopyA(&__LastErrorStr, app.__LastErrorStr);
 	return *this;
 }
 
-Bool P_ENTRY App::Terminate(UInt exitCode)
+Bool PE_CALL App::Terminate(UInt exitCode)
 {
-	if (!this->Good())
+	if (!Good())
 	{
-		this->SetLastError(PIE_ERROR_INVALID_CALL, "Must initialize class first!");
+		SetLastError(ERROR_INVALID_HANDLE, "Must initialize class first!");
 		return false;
 	}
-	if (TerminateProcess(this->hProc, exitCode))
+	if (TerminateProcess(hProc, exitCode))
 	{
-		this->hProc = INVALID_HANDLE_VALUE;
+		hProc = INVALID_HANDLE_VALUE;
 		return true;
 	}
-	this->SetLastError(PIE_ERROR_CANNOT_TERMINATE,
+	SetLastError(GetLastError(),
 		"Cannot terminate the process.");
 	return false;
 }
 
 Bool App::isRunning()
 {
-	if (this->Good())
+	if (Good())
 	{
 		Dword exitCode = 0;
-		if (GetExitCodeProcess(this->hProc, &exitCode))
+		if (GetExitCodeProcess(hProc, &exitCode))
 			if (exitCode == STILL_ACTIVE)
 				return true;
 	}
 	return false;
 }
 
-Bool App::getExitCode(Dword& dwExit)const
+Bool App::getExitCode(Dword& dwExit)
 {
-	if (this->Good())
-		if (GetExitCodeProcess(this->hProc, &dwExit))
+	if (Good())
+		if (GetExitCodeProcess(hProc, &dwExit))
 			return dwExit != STILL_ACTIVE;
 	return false;
 }
 
 Handle App::getProcAddr()
 {
-	return this->hProc;
+	return hProc;
 }
 
 const Handle App::getProcAddr()const
 {
-	return this->hProc;
+	return hProc;
 }
 
 
-PIDlist Pie_314::FindProcId(const SuperUnicodeString& name)
+PIDList pe::FindProcId(cStringW name)
 {
-	if (name.empty())
-		return std::move(PIDlist());
+	PIDList list;
+	list.addr = NULL; list.count = 0;
+	if (str::LenW(name) == 0)
+		return list;
 	PROCESSENTRY32W pEntry;
 	memset(&pEntry, 0, sizeof(PROCESSENTRY32W));
 	pEntry.dwSize = sizeof(PROCESSENTRY32W);
 	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	if (!Pie_314::HandleGood(hSnapshot))
-		return std::move(PIDlist());
+	if (pe::HandleBad(hSnapshot))
+		return list;
 	if (!Process32FirstW(hSnapshot, &pEntry))
 	{
 		CloseHandle(hSnapshot);
-		return std::move(PIDlist());
+		return list;
 	}
-	if (!name.compare(pEntry.szExeFile))
-	{
-		CloseHandle(hSnapshot);
-		return std::move(PIDlist());
-	}
-	PIDlist list;
-	list.push_back(pEntry.th32ProcessID);
-	while (Process32NextW(hSnapshot, &pEntry))
-	{
-		if (name.compare(pEntry.szExeFile))
+	std::vector<Dword> v;
+	do {
+		if (!str::EqualsW(name, pEntry.szExeFile))
 		{
-			list.push_back(pEntry.th32ProcessID);
+			v.push_back(pEntry.th32ProcessID);
 		}
-	}
+	} while (Process32NextW(hSnapshot, &pEntry));
+	list.Allocate(v.size());
+	if (list.addr)
+		memcpy_s(
+			list.addr, list.count * sizeof(Dword), 
+			&v[0], list.count * sizeof(Dword));
 	CloseHandle(hSnapshot);
-	return std::move(list);
+	return list;
+	return list;
 }
-SuperAnsiString Pie_314::FindProcNameA(Pie_314::Dword PID)
+StringA pe::FindProcNameA(Dword PID)
 {
 	if (PID == 0)
 	{
-		Pie_314::setLastErrorNum(PIE_ERROR_INVALID_PID);
-		return std::move(Pie_314::SuperAnsiString());
+		return NULL;
 	}
 	HANDLE hProcess = OpenProcess(
 		PROCESS_QUERY_LIMITED_INFORMATION,
 		FALSE, PID);
 	if (HandleGood(hProcess))
 	{
-		SuperAnsiString ret;
+		StringA ret;
 		DWORD buffSize = 1024;
-		ret.resize(1024U);
+		str::AllocA(&ret, buffSize);
 		if (QueryFullProcessImageNameA(hProcess,
-			0, ret.begin(), &buffSize))
+			0, ret, &buffSize))
 		{
-			ret.resize(buffSize);
+			str::ReAllocA(&ret, buffSize);
 		}
 		else {
-			ret.clear();
+			str::FreeA(&ret, 0);
 		}
 		CloseHandle(hProcess);
-		return std::move(ret);
+		return ret;
 	}
-	Pie_314::setLastErrorNum(PIE_ERROR_INVALID_PID);
-	return std::move(Pie_314::SuperAnsiString());
+	return NULL;
 }
-SuperUnicodeString Pie_314::FindProcNameW(Pie_314::Dword PID)
+StringW pe::FindProcNameW(Dword PID)
 {
 	if (PID == 0)
 	{
-		Pie_314::setLastErrorNum(PIE_ERROR_INVALID_PID);
-		return std::move(Pie_314::SuperUnicodeString());
+		return NULL;
 	}
 	HANDLE hProcess = OpenProcess(
 		PROCESS_QUERY_LIMITED_INFORMATION,
 		FALSE, PID);
 	if (HandleGood(hProcess))
 	{
-		SuperUnicodeString ret;
+		StringW ret;
 		DWORD buffSize = 1024;
-		ret.resize(1024U);
-		if (QueryFullProcessImageNameW(hProcess, 0, ret.begin(), &buffSize))
+		str::AllocW(&ret, buffSize);
+		if (QueryFullProcessImageNameW(hProcess, 0, ret, &buffSize))
 		{
-			ret.resize(buffSize);
+			str::ReAllocW(&ret, buffSize);
 		}
 		else {
-			ret.clear();
+			str::Free(&ret, 0);
 		}
 		CloseHandle(hProcess);
-		return std::move(ret);
+		return ret;
 	}
-	Pie_314::setLastErrorNum(PIE_ERROR_INVALID_PID);
-	return std::move(Pie_314::SuperUnicodeString());
-}
-
-Procedure ExtractProcessInfoReserved(ProcessBasicInfo& pbi, Handle hToken,
-	TOKEN_INFORMATION_CLASS tokenInfo, SuperUnicodeString& sDataW)
-{
-
-	Dword dwProcessTokenInfoAllocSize = 0;
-	GetTokenInformation(hToken, tokenInfo,
-		NULL, 0, &dwProcessTokenInfoAllocSize);
-	if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
-	{
-		PTOKEN_USER pUserToken = reinterpret_cast<PTOKEN_USER>
-			(Heap.Create(dwProcessTokenInfoAllocSize));
-		if (pUserToken == NULL)
-		{
-			return;
-		}
-		if (!GetTokenInformation(
-			hToken,
-			tokenInfo, pUserToken,
-			dwProcessTokenInfoAllocSize,
-			&dwProcessTokenInfoAllocSize))
-		{
-			Heap.Destroy(pUserToken);
-			return;
-		}
-		SID_NAME_USE   snuSIDNameUse;
-		wchar_t szUser[256];
-		memset(szUser, 0, 512);
-		Dword dwUserNameLength = 256;
-		wchar_t szDomain[256];
-		memset(szUser, 0, 512);
-		Dword dwDomainNameLength = 256;
-		if (LookupAccountSidW(NULL,
-			pUserToken->User.Sid,
-			szUser, &dwUserNameLength,
-			szDomain, &dwDomainNameLength,
-			&snuSIDNameUse))
-		{
-			sDataW = L"\\\\";
-			sDataW += szDomain;
-			sDataW += L"\\";
-			sDataW += szUser;
-		}
-		Heap.Destroy(pUserToken);
-	}
-}
-SuperProcessInfoArray Pie_314::ListAllProcess()
-{
-	Dword pProcs[512], dwCBNeeded;
-	if (!K32EnumProcesses(pProcs, 512 * sizeof(Dword), &dwCBNeeded))
-	{
-		return SuperProcessInfoArray();
-	}
-	Dword dwLen = dwCBNeeded / sizeof(Dword);
-	Dword dwCount = 0;
-	SuperProcessInfoArray aProcs(dwLen);
-	for (Dword i = 0; i < dwLen; i++)
-	{
-		if (pProcs[i])
-		{
-			Handle hProc = OpenProcess(
-				PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-				FALSE, pProcs[i]);
-			if (HandleGood(hProc))
-			{
-				ProcessBasicInfo& pbi = aProcs[dwCount];
-				memset(&pbi, 0, aProcs.getSingleElementSize());
-				pbi.dwId = pProcs[i];
-				Handle hToken = NULL;
-				if (OpenProcessToken(hProc,
-					TOKEN_READ, &hToken))
-				{
-					SuperUnicodeString sDataW;
-					ExtractProcessInfoReserved(pbi, hToken,
-						TokenUser, sDataW);
-					memcpy_s(pbi.swOwner, 64, sDataW.c_str(), sizeof(Wchar) * sDataW.size);
-					//ExtractProcessInfoReserved(pbi, hToken,
-						//TokenOwner, sDataW);
-					//memcpy_s(pbi.swOwner, 64, sDataW.c_str(), sizeof(Wchar) * sDataW.size);
-					sDataW = FindProcNameW(pbi.dwId);
-					int index = sDataW.lastIndexOf(L'\\');
-					if (index >= 0)
-					{
-						auto s2 = sDataW.substr(index + 1);
-						memcpy_s(pbi.swName, 64, s2.c_str(), 2 * s2.size);
-						s2 = sDataW.substr(0, index + 1);
-						memcpy_s(pbi.swName, 128, s2.c_str(), 2 * s2.size);
-					}
-					else {
-						memcpy_s(pbi.swName, 64, sDataW.c_str(), 2 * sDataW.size);
-					}
-					CloseHandle(hToken);
-				}
-				CloseHandle(hProc);
-			}
-		}
-	}
+	return NULL;
 }

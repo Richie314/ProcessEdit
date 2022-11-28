@@ -8,15 +8,10 @@ namespace pe
 	using LpLpChar = Char**;
 	using LpLpWcharT = Wchar**;
 	typedef struct {
-		SuperAnsiString sPath;
+		StringA sPath;
 		HMODULE hModule;
 	} hLoadedLib;
-	using PLoadedLibraries = SuperArray<hLoadedLib>;
 
-	typedef struct
-	{
-
-	} ProcessInfo, * pProcessInfo, LPProcessInfo;
 	enum enumICON
 	{
 		EXTRALARGE_SIZE = 0,
@@ -62,46 +57,48 @@ namespace pe
 		} Hook, * LPHook;
 
 
-		typedef struct {
+		struct BasicStruct 
+		{
 			Int32* iExitCode;
 			Dword dwAddr;
-		} BOOLStruct, * lpBOOLStruct;
+		};
+		using BOOLStruct = BasicStruct;
 		using BOOLProcedure = BOOL(__stdcall*)();
-		typedef struct {
-			Int32* iExitCode;
-			Dword dwAddr;
+
+		struct LPCSTRStruct : public BasicStruct
+		{
 			LPSTR pString;
-		} LPCSTRStruct, * lpLPCSTRStruct;
+		};
 		using LPCSTRProcedure = BOOL(__stdcall*)(LPCSTR);
-		typedef struct {
-			Int32* iExitCode;
-			Dword dwAddr;
+
+		struct LPCWSTRStruct : public BasicStruct
+		{
 			LPWSTR pString;
-		} LPCWSTRStruct, * lpLPCWSTRStruct;
+		};
 		using LPCWSTRProcedure = BOOL(__stdcall*)(LPCWSTR);
-		typedef struct {
-			Int32* iExitCode;
-			Dword dwAddr;
+
+		struct DWORDStruct : public BasicStruct
+		{
 			Dword* dwParam;
-		} DWORDStruct, * lpDWORDStruct;
+		};
 		using DWORDProcedure = BOOL(__stdcall*)(DWORD);
-		typedef struct {
-			Int32* iExitCode;
-			Dword dwAddr;
+
+		struct PrintStructA : public BasicStruct 
+		{
 			CHAR* sOut;
 			Handle* hStream;
 			Dword* dwWrite;
 			Dword** dwWritten;
-		} PrintStructA, * lpPrintStructA;
+		};
 		using PrintProcedureA = BOOL(__stdcall*)(HANDLE, LPCVOID, DWORD, LPDWORD, LPVOID);
-		typedef struct {
-			Int32* iExitCode;
-			Dword dwAddr;
+		
+		struct PrintStructW : public BasicStruct 
+		{
 			WCHAR* sOut;
 			Handle* hStream;
 			Dword* dwWrite;
 			Dword** dwWritten;
-		} PrintStructW, * lpPrintStructW;
+		};
 		using PrintProcedureW = BOOL(__stdcall*)(HANDLE, LPCVOID, DWORD, LPDWORD, LPVOID);
 	}
 }
