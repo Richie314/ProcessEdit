@@ -65,7 +65,7 @@ BOOL __stdcall RemotePrintWProcedureThread(Reserved::PrintStructW* data)
 BOOL PE_CALL App::Console_t::Create()
 {
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return FALSE;
 	}
@@ -84,7 +84,7 @@ BOOL PE_CALL App::Console_t::Create()
 BOOL PE_CALL App::Console_t::Create(cStringA sCaption)
 {
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return FALSE;
 	}
@@ -107,7 +107,7 @@ BOOL PE_CALL App::Console_t::Create(cStringA sCaption)
 BOOL PE_CALL App::Console_t::Create(cStringW sCaption)
 {
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return FALSE;
 	}
@@ -130,7 +130,7 @@ BOOL PE_CALL App::Console_t::Create(cStringW sCaption)
 BOOL PE_CALL App::Console_t::SetTitle(cStringA sCaption)
 {
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return FALSE;
 	}
@@ -146,7 +146,7 @@ BOOL PE_CALL App::Console_t::SetTitle(cStringA sCaption)
 BOOL PE_CALL App::Console_t::SetTitle(cStringW sCaption)
 {
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return FALSE;
 	}
@@ -162,7 +162,7 @@ BOOL PE_CALL App::Console_t::SetTitle(cStringW sCaption)
 BOOL PE_CALL App::Console_t::Destroy()
 {
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return FALSE;
 	}
@@ -179,7 +179,7 @@ BOOL PE_CALL App::Console_t::Destroy()
 BOOL PE_CALL App::Console_t::Write(cStringA sData)
 {
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return FALSE;
 	}
@@ -195,7 +195,7 @@ BOOL PE_CALL App::Console_t::Write(cStringA sData)
 BOOL PE_CALL App::Console_t::Write(cStringW sData)
 {
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return FALSE;
 	}
@@ -213,7 +213,7 @@ void App::Console_t::UpdateHandle()
 	if (hWnd == NULL)
 		return;
 	App* app = static_cast<App*>(pParent);
-	if (app == PE_NULL(App))
+	if (app == nullptr)
 	{
 		return;
 	}

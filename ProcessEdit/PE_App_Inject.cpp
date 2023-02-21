@@ -4,7 +4,7 @@
 using namespace pe;
 using namespace pe::Reserved;
 
-
+#pragma warning(disable: 6387)
 Bool App::InjectDll(cStringA dllPath)
 {
 	size_t length = str::LenA(dllPath);
@@ -16,7 +16,7 @@ Bool App::InjectDll(cStringA dllPath)
 		return false;
 	}
 	if (!WriteProcessMemory(hProc, mem,
-		(LPCVOID)dllPath, length, PE_NULL(size_t)))
+		(LPCVOID)dllPath, length, nullptr))
 	{
 		//VirtualFreeEx(hProc, mem, path.length(), MEM_RELEASE);
 		VirtualFreeEx(hProc, mem, 0, MEM_RELEASE);
@@ -52,7 +52,7 @@ Bool App::InjectDll(cStringW dllPath)
 	if (mem)
 	{
 		if (!WriteProcessMemory(hProc, mem,
-			(LPCVOID)dllPath, length, PE_NULL(size_t)))
+			(LPCVOID)dllPath, length, nullptr))
 		{
 			//VirtualFreeEx(hProc, mem, path.length() * 2, MEM_RELEASE);
 			VirtualFreeEx(hProc, mem, 0, MEM_RELEASE);
@@ -112,7 +112,7 @@ Int32 App::InjectMessageBox(Hwnd hWnd, cStringA sCaption,
 	//Allocate space for exit code of MessageBoxA (int)
 	data.iExitCode = (Int32*)VirtualAllocEx(hProc, NULL, sizeof(Int32),
 		MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-	if (data.iExitCode == PE_NULL(Int32))
+	if (data.iExitCode == nullptr)
 	{
 		DWORD lastError = GetLastError();
 		SetLastError(lastError,
@@ -128,7 +128,7 @@ Int32 App::InjectMessageBox(Hwnd hWnd, cStringA sCaption,
 		data.lpTitle = (char*)VirtualAllocEx(
 			hProc, NULL, str::LenA(sCaption),
 			MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-		if (data.lpTitle == PE_NULL(char))
+		if (data.lpTitle == nullptr)
 		{
 			DWORD lastError = GetLastError();
 			SetLastError(lastError,
@@ -147,7 +147,7 @@ Int32 App::InjectMessageBox(Hwnd hWnd, cStringA sCaption,
 		data.lpMessage = (char*)VirtualAllocEx(
 			hProc, NULL, str::LenA(sMessage),
 			MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-		if (data.lpMessage == PE_NULL(char))
+		if (data.lpMessage == nullptr)
 		{
 			DWORD lastError = GetLastError();
 			SetLastError(lastError,
@@ -210,7 +210,7 @@ Int32 App::InjectMessageBox(Hwnd hWnd, cStringA sCaption,
 	//Create the thread
 	Handle hNewThread = CreateRemoteThread(hProc, NULL, NULL,
 		(LPTHREAD_START_ROUTINE)lpThread, pParam, NULL, NULL);
-	if (!HandleGood(hNewThread))
+	if (HandleBad(hNewThread))
 	{
 		SetLastError(GetLastError(), "Cannot create the thread.");
 		VirtualFreeEx(hProc, lpThread, 0, MEM_RELEASE);
@@ -261,7 +261,7 @@ Int32 App::InjectMessageBox(Hwnd hWnd, cStringW sCaption,
 	//Allocate space for exit code of MessageBoxW (int)
 	data.iExitCode = (Int32*)VirtualAllocEx(hProc, NULL, sizeof(Int32),
 		MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-	if (data.iExitCode == PE_NULL(Int32))
+	if (data.iExitCode == nullptr)
 	{
 		DWORD lastError = GetLastError();
 		SetLastError(lastError,
@@ -277,7 +277,7 @@ Int32 App::InjectMessageBox(Hwnd hWnd, cStringW sCaption,
 		data.lpTitle = (wchar_t*)VirtualAllocEx(
 			hProc, NULL, str::LenW(sCaption) * 2,
 			MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-		if (data.lpTitle == PE_NULL(wchar_t))
+		if (data.lpTitle == nullptr)
 		{
 			DWORD lastError = GetLastError();
 			SetLastError(lastError,
@@ -297,7 +297,7 @@ Int32 App::InjectMessageBox(Hwnd hWnd, cStringW sCaption,
 		data.lpMessage = (wchar_t*)VirtualAllocEx(
 			hProc, NULL, str::LenW(sMessage) * 2,
 			MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-		if (data.lpMessage == PE_NULL(wchar_t))
+		if (data.lpMessage == nullptr)
 		{
 			DWORD lastError = GetLastError();
 			SetLastError(lastError,

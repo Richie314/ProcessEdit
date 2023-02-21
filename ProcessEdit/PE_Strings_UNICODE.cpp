@@ -19,15 +19,17 @@ Bool PE_CALL str::AllocW(StringW* ptr, size_t len)
 }
 Bool PE_CALL str::ReAllocW(StringW* ptr, size_t len)
 {
-	len *= sizeof(Wchar);
 	if (ptr) {
 		StringW addr = *ptr;
-		HGLOBAL hMem = GlobalReAlloc((HGLOBAL)addr, len, GMEM_ZEROINIT);
-		if (hMem)
-		{
-			addr = (StringW)hMem;
-			return len == GlobalSize(hMem);
+		if (addr) {
+			HGLOBAL hMem = GlobalReAlloc((HGLOBAL)addr, len * sizeof(Wchar), GMEM_ZEROINIT);
+			if (hMem)
+			{
+				addr = (StringW)hMem;
+				return len * sizeof(Wchar) == GlobalSize(hMem);
+			}
 		}
+		return str::AllocW(ptr, len);
 	}
 	return false;
 }
@@ -36,7 +38,7 @@ Bool PE_CALL str::FreeW(StringW* ptr, size_t len)
 	len *= sizeof(Wchar);
 	if (ptr) {
 		StringW addr = *ptr;
-		if (GlobalFree((HGLOBAL)addr) == NULL)
+		if (addr && GlobalFree((HGLOBAL)addr) == NULL)
 		{
 			addr = NULL;
 			return true;
@@ -89,14 +91,13 @@ Bool str::ContainsW(cStringW s, Wchar w)
 			{
 				return true;
 			}
-			s += sizeof(Wchar);
+			s++;
 		}
 	}
 	return false;
 }
 Bool str::StartsWithW(cStringW s, Wchar w)
 {
-	//Faster than a for cicle
 	if (s && *s == w)
 	{
 		return true;

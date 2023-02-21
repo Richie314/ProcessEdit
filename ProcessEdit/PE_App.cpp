@@ -17,9 +17,9 @@ Bool isValidProgramStr(cStringW& name)
 }
 
 void GetAllWindowsFromProcessID(
-	DWORD dwProcessID, Array<Hwnd>& vhWnds)
+	DWORD dwProcessID, List<Hwnd>& vhWnds)
 {
-	std::vector<Hwnd> v;
+	vhWnds.clear();
 	Hwnd hCurWnd = NULL;
 	do
 	{
@@ -28,15 +28,9 @@ void GetAllWindowsFromProcessID(
 		GetWindowThreadProcessId(hCurWnd, &dwProcID);
 		if (dwProcID == dwProcessID)
 		{
-			v.push_back(hCurWnd);
+			vhWnds.push(hCurWnd);
 		}
 	} while (hCurWnd != NULL);
-	vhWnds.DeAllocate();
-	vhWnds.Allocate(v.size());
-	if (vhWnds.addr)
-		memcpy_s(
-			vhWnds.addr, sizeof(Hwnd) * vhWnds.count,
-			&v[0], sizeof(Hwnd) * v.size());
 }
 void App::SetLastError(Uint error,
 	 cStringA errorStr)
@@ -146,8 +140,9 @@ void App::Close()
 			CloseHandle(hProc);
 		if (HandleGood(hToken))
 			CloseHandle(hToken);
+		LoadedLibraries.clear();
 	}
-	hwnds.DeAllocate();
+	hwnds.clear();
 	str::FreeW(&sLocation, 0);
 	str::FreeW(&sName, 0);
 	str::FreeW(&sUser, 0);
@@ -160,18 +155,21 @@ Hwnd App::FindThisWindowFromContent(cStringW caption)const
 {
 	StringW s;
 	size_t size = str::LenW(caption);
-	if (!size)
+	if (!size || hwnds.isEmpty())
 		return NULL;
 	if (!str::AllocW(&s, size))
 		return NULL;
 	Hwnd curr = NULL;
-	for (size_t i = 0; i < hwnds.count; ++i)
+	for (
+		const List<Hwnd>* pHwnd = &hwnds;
+		pHwnd != nullptr && !pHwnd->isEmpty();
+		pHwnd = pHwnd->Next)
 	{
-		if (GetWindowTextW(hwnds[i], s, size + 1U))
+		if (GetWindowTextW(*pHwnd->Value, s, size + 1U))
 		{
 			if (str::EqualsW(s, caption))
 			{
-				curr = hwnds[i];
+				curr = *pHwnd->Value;
 				break;
 			}
 		}
@@ -188,13 +186,16 @@ Hwnd App::FindThisWindowFromContent(cStringA caption)const
 	if (!str::AllocA(&s, size))
 		return NULL;
 	Hwnd curr = NULL;
-	for (size_t i = 0; i < hwnds.count; ++i)
+	for (
+		const List<Hwnd>* pHwnd = &hwnds;
+		pHwnd != nullptr && !pHwnd->isEmpty();
+		pHwnd = pHwnd->Next)
 	{
-		if (GetWindowTextA(hwnds[i], s, size + 1U))
+		if (GetWindowTextA(*pHwnd->Value, s, size + 1U))
 		{
 			if (str::EqualsA(s, caption))
 			{
-				curr = hwnds[i];
+				curr = *pHwnd->Value;
 				break;
 			}
 		}
@@ -309,13 +310,9 @@ Bool PE_CALL App::WriteMemory(const Memory addr, const Memory buffer, size_t siz
 Dword App::FindProcId()const
 {
 	PIDList list = pe::FindProcId(sName);
-	Dword dwPID = 0;
-	if (list.count && list.addr)
-	{
-		dwPID = list[0];
-		list.DeAllocate();
-	}
-	return dwPID;
+	if (list.isEmpty())
+		return 0;
+	return *list.Value;
 }
 
 void App::OpenStreamProcess(Bool bWrite)
@@ -412,6 +409,7 @@ App& App::fromOtherStream(App&& app)
 	hProc = app.hProc;
 	hToken = app.hToken;
 	hwnds.CopyFrom(app.hwnds);
+	LoadedLibraries.CopyFrom(app.LoadedLibraries);
 	pId = app.pId;
 	str::CopyW(&sLocation, app.sLocation);
 	str::CopyW(&sName, app.sName);
@@ -432,6 +430,7 @@ App& App::fromOtherStream(const App& app)
 	hProc = app.hProc;
 	hToken = app.hToken;
 	hwnds.CopyFrom(app.hwnds);
+	LoadedLibraries.CopyFrom(app.LoadedLibraries);
 	pId = app.pId;
 	str::CopyW(&sLocation, app.sLocation);
 	str::CopyW(&sName, app.sName);
@@ -492,7 +491,6 @@ const Handle App::getProcAddr()const
 PIDList pe::FindProcId(cStringW name)
 {
 	PIDList list;
-	list.addr = NULL; list.count = 0;
 	if (str::LenW(name) == 0)
 		return list;
 	PROCESSENTRY32W pEntry;
@@ -506,20 +504,13 @@ PIDList pe::FindProcId(cStringW name)
 		CloseHandle(hSnapshot);
 		return list;
 	}
-	std::vector<Dword> v;
 	do {
 		if (!str::EqualsW(name, pEntry.szExeFile))
 		{
-			v.push_back(pEntry.th32ProcessID);
+			list.push(pEntry.th32ProcessID);
 		}
 	} while (Process32NextW(hSnapshot, &pEntry));
-	list.Allocate(v.size());
-	if (list.addr)
-		memcpy_s(
-			list.addr, list.count * sizeof(Dword), 
-			&v[0], list.count * sizeof(Dword));
 	CloseHandle(hSnapshot);
-	return list;
 	return list;
 }
 StringA pe::FindProcNameA(Dword PID)

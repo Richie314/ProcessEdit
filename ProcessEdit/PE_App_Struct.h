@@ -4,13 +4,11 @@ namespace pe
 {
 
 	using Key = Wchar;
-	using KeyPtr = Key*;
-	using LpLpChar = Char**;
-	using LpLpWcharT = Wchar**;
-	typedef struct {
+	struct LoadedLib
+	{
 		StringA sPath;
 		HMODULE hModule;
-	} hLoadedLib;
+	};
 
 	enum enumICON
 	{

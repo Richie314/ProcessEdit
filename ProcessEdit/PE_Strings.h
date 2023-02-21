@@ -40,7 +40,6 @@ namespace pe
 		PE_API Bool EqualsA(cStringA, cStringA);
 		PE_API Bool EndsWithA(cStringA, Char);
 
-
 		PE_API Bool PE_CALL CatW(StringW, cStringW);
 		PE_API Bool PE_CALL CopyW(StringW*, cStringW);
 		PE_API Bool PE_CALL CopyW(StringW*, cStringW, size_t);
@@ -62,54 +61,145 @@ namespace pe
 		PE_API Bool EndsWithW(cStringW, Wchar);
 
 
+		PE_API StringW AtoW(cStringA);
+		PE_API StringA WtoA(cStringW);
 #ifdef UNICODE
-		constexpr PE_INLINE Bool PE_CALL Cat(String left, cString right)
+		PE_INLINE Bool PE_CALL Cat(String a, cString b)
 		{
-			return CatW(left, right);
+			return CatW(a, b);
 		}
-		constexpr PE_INLINE Bool PE_CALL Alloc(String* block, size_t size)
+		PE_INLINE Bool PE_CALL Copy(String* a, cString b)
 		{
-			return AllocW(block, size);
+			return CopyW(a, b);
+		}
+		PE_INLINE Bool PE_CALL Copy(String* a, cString b, size_t s)
+		{
+			return CopyW(a, b, s);
+		}
+		PE_INLINE Bool PE_CALL Replace(String s, Wchar a, Wchar b)
+		{
+			return ReplaceW(s, a, b);
+		}
+		PE_INLINE String Since(String s, size_t i)
+		{
+			return SinceW(s, i);
+		}
+		PE_INLINE cString Since(cString s, size_t i)
+		{
+			return SinceW(s, i);
 		}
 
-		constexpr PE_INLINE Bool PE_CALL ReAlloc(String* block, size_t size)
+		PE_INLINE Bool PE_CALL Alloc(String* s, size_t l)
 		{
-			return ReAllocW(block, size);
+			return AllocW(s, l);
 		}
-		constexpr PE_INLINE Bool PE_CALL Free(String* block, size_t size)
+		PE_INLINE Bool PE_CALL ReAlloc(String* s, size_t l)
 		{
-			return FreeW(block, size);
+			return ReAllocW(s, l);
 		}
-		constexpr PE_INLINE size_t Len(cString s)
+		PE_INLINE Bool PE_CALL Free(String* s, size_t l)
+		{
+			return FreeW(s, l);
+		}
+
+		PE_INLINE size_t Len(cString s)
 		{
 			return LenW(s);
 		}
-		constexpr PE_INLINE Bool Contains(cString s, Wchar w)
-		{
-			return ContainsW(s, w);
-		}
-		constexpr PE_INLINE Bool PE_CALL Copy(String* block, cString s)
-		{
-			return CopyW(block, s);
-		}
-		constexpr PE_INLINE Int32 IndexOf(cString s, Wchar w)
+		PE_INLINE Int32 IndexOf(cString s, Wchar w)
 		{
 			return IndexOfW(s, w);
 		}
-		constexpr PE_INLINE Bool StartsWith(cString s, Wchar w)
+		PE_INLINE Int32 LastIndexOf(cString s, Wchar w)
+		{
+			return LastIndexOfW(s, w);
+		}
+
+		PE_INLINE Bool Contains(cString s, Wchar w)
+		{
+			return ContainsW(s, w);
+		}
+		PE_INLINE Bool StartsWith(cString s, Wchar w)
 		{
 			return StartsWithW(s, w);
 		}
-		constexpr PE_INLINE Bool Equals(cString l, cString r)
+		PE_INLINE Bool Equals(cString l, cString r)
 		{
 			return EqualsW(l, r);
 		}
-		constexpr PE_INLINE Bool EndsWith(cString s, Wchar w)
+		PE_INLINE Bool EndsWith(cString s, Wchar w)
 		{
 			return EndsWithW(s, w);
 		}
-	}
+	
 #else
-		
+		PE_INLINE Bool PE_CALL Cat(String a, cString b)
+		{
+			return CatA(a, b);
+		}
+		PE_INLINE Bool PE_CALL Copy(String* a, cString b)
+		{
+			return CopyA(a, b);
+		}
+		PE_INLINE Bool PE_CALL Copy(String* a, cString b, size_t s)
+		{
+			return CopyA(a, b, s);
+		}
+		PE_INLINE Bool PE_CALL Replace(String s, Wchar a, Wchar b)
+		{
+			return ReplaceA(s, a, b);
+		}
+		PE_INLINE String Since(String s, size_t i)
+		{
+			return SinceA(s, i);
+		}
+		PE_INLINE cString Since(cString s, size_t i)
+		{
+			return SinceA(s, i);
+		}
+
+		PE_INLINE Bool PE_CALL Alloc(String* s, size_t l)
+		{
+			return AllocA(s, l);
+		}
+		PE_INLINE Bool PE_CALL ReAlloc(String* s, size_t l)
+		{
+			return ReAllocA(s, l);
+		}
+		PE_INLINE Bool PE_CALL Free(String* s, size_t l)
+		{
+			return FreeA(s, l);
+		}
+
+		PE_INLINE size_t Len(cString s)
+		{
+			return LenA(s);
+		}
+		PE_INLINE Int32 IndexOf(cString s, Char c)
+		{
+			return IndexOfA(s, c);
+		}
+		PE_INLINE Int32 LastIndexOf(cString s, Char c)
+		{
+			return LastIndexOfA(s, c);
+		}
+
+		PE_INLINE Bool Contains(cString s, Char c)
+		{
+			return ContainsA(s, c);
+		}
+		PE_INLINE Bool StartsWith(cString s, Char c)
+		{
+			return StartsWithA(s, c);
+		}
+		PE_INLINE Bool Equals(cString l, cString r)
+		{
+			return EqualsA(l, r);
+		}
+		PE_INLINE Bool EndsWith(cString s, Char c)
+		{
+			return EndsWithA(s, c);
+		}
 #endif
+	}
 }

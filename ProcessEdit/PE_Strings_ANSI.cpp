@@ -20,12 +20,15 @@ Bool PE_CALL str::ReAllocA(StringA* ptr, size_t len)
 {
 	if (ptr) {
 		StringA addr = *ptr;
-		HGLOBAL hMem = GlobalReAlloc((HGLOBAL)addr, len, GMEM_ZEROINIT);
-		if (hMem)
-		{
-			addr = (StringA)hMem;
-			return len == GlobalSize(hMem);
+		if (addr) {
+			HGLOBAL hMem = GlobalReAlloc((HGLOBAL)addr, len, GMEM_ZEROINIT);
+			if (hMem)
+			{
+				addr = (StringA)hMem;
+				return len == GlobalSize(hMem);
+			}
 		}
+		return str::AllocA(ptr, len);
 	}
 	return false;
 }
@@ -33,7 +36,7 @@ Bool PE_CALL str::FreeA(StringA* ptr, size_t len)
 {
 	if (ptr) {
 		StringA addr = *ptr;
-		if (GlobalFree((HGLOBAL)addr) == NULL)
+		if (addr && GlobalFree((HGLOBAL)addr) == NULL)
 		{
 			addr = NULL;
 			return true;
@@ -128,7 +131,7 @@ Bool PE_CALL str::CopyA(StringA* destination, cStringA source)
 		return false;
 	size_t len = str::LenA(source);
 	if (len) {
-		if (str::AllocA(destination, len))
+		if (str::ReAllocA(destination, len))
 		{
 			return (Bool)lstrcpyA(*destination, source);
 		}

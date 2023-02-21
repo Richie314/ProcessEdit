@@ -4,32 +4,34 @@
 using namespace pe;
 using namespace pe::Reserved;
 #pragma warning(disable: 6388)
-Bool App::FindProcAddressInLibrary(LPCSTR sFunc, LPCSTR sLib, Memory pVal)
+#pragma warning(disable: 6387)
+Bool App::FindProcAddressInLibrary(cStringA sFunc, cStringA sLib, Memory pVal)
 {
 	if (!Good())
 		return false;
-	size_t contains = ListLoadedLibraries.size;
-	for (size_t i = 0; i < contains; i++)
+	for (
+		const List<LoadedLib>* LoadedLibrary = &LoadedLibraries;
+		LoadedLibrary != nullptr && !LoadedLibrary->isEmpty();
+		LoadedLibrary = LoadedLibrary->Next)
 	{
-		if (ListLoadedLibraries[i].sPath.compare(sLib))
-			contains = i;
-	}
-	if (contains < ListLoadedLibraries.size)
-	{
-		HMODULE hModule = ListLoadedLibraries[contains].hModule;
+		if (!str::EqualsA(LoadedLibrary->Value->sPath, sLib))
+		{
+			continue;
+		}
+		HMODULE hModule = LoadedLibrary->Value->hModule;
 		if (!HandleGood(hModule)) {
-			SetLastError(PIE_ERROR_HANDLE_ERROR,
-				SuperAnsiString("Impossible to get the HMODULE of ") + sLib);
+			SetLastError(ERROR_INVALID_HANDLE,
+				(std::string("Impossible to get the HMODULE of ") + sLib).c_str());
 			return false;
 		}
 		*((FARPROC*)pVal) = GetProcAddress(hModule, sFunc);
 		if (*((FARPROC*)pVal) == NULL)
 		{
-			SetLastError(PIE_ERROR_MEMORY_ERROR | PIE_ERROR_HANDLE_ERROR,
-				SuperAnsiString("Impossible to find the address of ") + sFunc +
-				" in " + sLib);
+			SetLastError(ERROR_INVALID_HANDLE,
+				(std::string("Impossible to get the address of ") + sFunc).c_str());
 			return false;
 		}
+		//Process found in already loaded library
 		return true;
 	}
 	HMODULE hLib = LoadLibraryExA(sLib, hProc,
@@ -37,39 +39,83 @@ Bool App::FindProcAddressInLibrary(LPCSTR sFunc, LPCSTR sLib, Memory pVal)
 		LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
 	if (HandleGood(hLib))
 	{
-		ListLoadedLibraries.push_back({ sLib, hLib });
+		LoadedLib lib;
+		lib.hModule = hLib;
+		str::CopyA(&lib.sPath, sLib);
+		LoadedLibraries.push(lib);
 		*((FARPROC*)pVal) = GetProcAddress(hLib, sFunc);
 		if (*((FARPROC*)pVal))
 		{
 			return true;
 		}
-		SetLastError(PIE_ERROR_MEMORY_ERROR | PIE_ERROR_HANDLE_ERROR,
-			SuperAnsiString("Impossible to find the address of ") + sFunc +
-			" in " + sLib);
+		SetLastError(ERROR_INVALID_HANDLE,
+			(std::string("Impossible to find the address of ") + sFunc +
+				std::string(" in ") + sLib).c_str());
 		return false;
 	}
-	SetLastError(PIE_ERROR_HANDLE_ERROR, "Impossible to load the requested library");
+	SetLastError(ERROR_INVALID_HANDLE, "Impossible to load the requested library");
 	return false;
 }
 
 void App::ListLibraries()
 {
-	ListLoadedLibraries.clear();
-	if (Good())
+	LoadedLibraries.clear();
+	if (!Good())
 	{
-		HMODULE aModule[512];
-		Dword dwCbNeeded;
-		if (K32EnumProcessModules(hProc, aModule, sizeof(HMODULE) * 512, &dwCbNeeded))
+		return;
+	}
+	Array<HMODULE> aModule;
+	aModule.Allocate(512U);
+	Dword dwCbNeeded;
+	if (K32EnumProcessModules(
+		hProc, aModule.addr, 
+		sizeof(HMODULE) * aModule.count, &dwCbNeeded))
+	{
+		dwCbNeeded /= sizeof(HMODULE);
+		for (size_t i = 0; i < dwCbNeeded; ++i)
 		{
-			for (size_t i = 0; i < (dwCbNeeded / sizeof(HMODULE)); i++)
+			StringA sModName;
+			str::AllocA(&sModName, MAX_PATH);
+			if (K32GetModuleFileNameExA(hProc, aModule[i], sModName, MAX_PATH))
 			{
-				char sModName[MAX_PATH];
-				memset(sModName, 0, MAX_PATH);
-				if (K32GetModuleFileNameExA(hProc, aModule[i], sModName, MAX_PATH))
-				{
-					ListLoadedLibraries.push_back({ sModName, aModule[i] });
-				}
+				LoadedLib lib;
+				lib.hModule = aModule[i];
+				str::CopyA(&lib.sPath, sModName);
+				LoadedLibraries.push(lib);
 			}
 		}
 	}
+	aModule.DeAllocate();
+}
+
+Bool App::IsLibraryLoaded(cStringA sLib)const
+{
+	if (str::LenA(sLib) == 0 || LoadedLibraries.isEmpty())
+		return false;
+	for (
+		const List<LoadedLib>* LoadedLibrary = &LoadedLibraries; 
+		LoadedLibrary != nullptr && !LoadedLibrary->isEmpty();
+		LoadedLibrary = LoadedLibrary->Next)
+	{
+		if (str::EqualsA(LoadedLibrary->Value->sPath, sLib))
+			return true;
+	}
+	return false;
+}
+Bool App::IsLibraryLoaded(cStringW sLib)const
+{
+	if (str::LenW(sLib) == 0)
+		return false;
+	StringA AnsiEquivalent = str::WtoA(sLib);
+	Bool bReturn = false;
+	for (
+		const List<LoadedLib>* LoadedLibrary = &LoadedLibraries;
+		LoadedLibrary != nullptr && !LoadedLibrary->isEmpty();
+		LoadedLibrary = LoadedLibrary->Next)
+	{
+		if (str::EqualsA(LoadedLibrary->Value->sPath, AnsiEquivalent))
+			return true;
+	}
+	str::FreeA(&AnsiEquivalent, 0);
+	return bReturn;
 }

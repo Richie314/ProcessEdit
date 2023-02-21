@@ -1,25 +1,10 @@
 #pragma once
 #include "PE_App_Struct.h"
-
 #define PE_APP_READONLY false
 #define PE_APP_READWRITE true
 
 namespace pe
 {
-
-
-	/// <summary>
-	/// Returns the icon's path associated with that file extension
-	/// </summary>
-	/// <param name="sFileType">The file extension (ANSI)</param>
-	/// <returns>The path to the file if found</returns>
-	PE_API StringA getFileTypeIcon(const StringA sFileType);
-	/// <summary>
-	/// Returns the icon's path associated with that file extension
-	/// </summary>
-	/// <param name="sFileType">The file extension (UNICODE)</param>
-	/// <returns>The path to the file if found</returns>
-	PE_API StringW getFileTypeIcon(const StringW sFileType);
 	/// <summary>
 	/// Simple informations about a process, such as its id and his name
 	/// </summary>
@@ -42,7 +27,7 @@ namespace pe
 		/// </summary>
 		Dword dwId;
 	} AppBasicInfo, * LpAppBasicInfo, * pProcessBasicInfo;
-	using PIDList = Array<Dword>;
+	using PIDList = List<Dword>;
 	/// <summary>
 	/// Class for interacting win windows process, 
 	/// to use most of these methods the program should run as administrator
@@ -52,7 +37,7 @@ namespace pe
 	private:
 		Handle hProc, hToken;
 		Dword pId;
-		Array<Hwnd> hwnds;
+		List<Hwnd> hwnds;
 		StringW sName;
 		StringW sLocation;
 		StringW sUser;
@@ -62,12 +47,13 @@ namespace pe
 		PE_API void SetLastError(
 			Uint error,
 			cStringA errorStr);
+		List<LoadedLib> LoadedLibraries;
 	public:
-		PE_INLINE constexpr Uint getLastError()const
+		PE_INLINE Uint getLastError()const
 		{
 			return this->__LastError;
 		}
-		PE_INLINE constexpr const StringA getLastErrorStr()const
+		PE_INLINE const StringA getLastErrorStr()const
 		{
 			return this->__LastErrorStr;
 		}
@@ -118,9 +104,18 @@ namespace pe
 			Memory* destination)const;
 
 		PE_API Bool PE_CALL WriteMemory(const Memory addr, const Memory buff, size_t blockSize);
-
+	private:
 		PE_API Hwnd FindThisWindowFromContent(cStringA caption)const;
 		PE_API Hwnd FindThisWindowFromContent(cStringW caption)const;
+	public:
+		PE_INLINE Hwnd FindThisWindowFromContent(const std::string& caption)const
+		{
+			return FindThisWindowFromContent((cStringA)caption.c_str());
+		}
+		PE_INLINE Hwnd FindThisWindowFromContent(const std::wstring& caption)const
+		{
+			return FindThisWindowFromContent((cStringW)caption.c_str());
+		}
 
 		PE_INLINE Bool Good()const
 		{
@@ -134,33 +129,67 @@ namespace pe
 		PE_API Bool getExitCode(Dword& exitCode);
 
 		PE_API const Handle getProcAddr()const;
-
 		PE_API Handle getProcAddr();
-
+	private:
 		PE_API Bool InjectDll(cStringA libraryPath);
 		PE_API Bool InjectDll(cStringW libraryPath);
+	public:
+		/// <summary>
+		/// Injects a DLL into the running process pointed from this instance
+		/// Note: The current process (not the one pointed) should be running with administrator privileges
+		/// </summary>
+		/// <param name="libraryPath">The path to the library (ANSI)</param>
+		/// <returns>true/false for success/error</returns>
+		PE_INLINE Bool InjectDll(const std::string& libraryPath) 
+		{
+			return InjectDll((cStringA)libraryPath.c_str());
+		}
+
+		/// <summary>
+		/// Injects a DLL into the running process pointed from this instance
+		/// Note: The current process (not the one pointed) should be running with administrator privileges
+		/// </summary>
+		/// <param name="libraryPath">The path to the library (UNICODE)</param>
+		/// <returns>true/false for success/error</returns>
+		PE_INLINE Bool InjectDll(const std::wstring& libraryPath)
+		{
+			return InjectDll((cStringW)libraryPath.c_str());
+		}
+
+	private:
+		PE_API Int32 InjectMessageBox(Hwnd hWnd, cStringA caption,
+			cStringA message, UInt uType = MB_OK);
+		PE_API Int32 InjectMessageBox(Hwnd hWnd, cStringW caption,
+			cStringW message, UInt uType = MB_OK);
+	public:
 		/// <summary>
 		/// Forces the Process to call MessageBoxA, you can define the
 		/// parameters and retreive the return value
 		/// </summary>
 		/// <param name="hWnd">The window to call MessageBoxA on</param>
-		/// <param name="caption">The caption of the message box (max 256 char)</param>
-		/// <param name="message">The body of the message box (max 256 char)</param>
+		/// <param name="caption">The caption of the message box</param>
+		/// <param name="message">The body of the message box</param>
 		/// <param name="uType">Define the messagebox type, default is MB_ICON</param>
 		/// <returns>The return value of MessageBoxA, 0 for error</returns>
-		PE_API Int32 InjectMessageBox(Hwnd hWnd, cStringA caption,
-			cStringA message, UInt uType = MB_OK);
+		PE_INLINE Int32 InjectMessageBox(Hwnd hWnd, const std::string& caption,
+			const std::string& message, UInt uType = MB_OK)
+		{
+			return InjectMessageBox(hWnd, (cStringA)caption.c_str(), (cStringA)message.c_str(), uType);
+		}
 		/// <summary>
 		/// Forces the Process to call MessageBoxW, you can define the
 		/// parameters and retreive the return value
 		/// </summary>
 		/// <param name="hWnd">The window to call MessageBoxW on</param>
-		/// <param name="caption">The caption of the message box (max 256 wchar_t)</param>
-		/// <param name="message">The body of the message box (max 256 wchar_t)</param>
+		/// <param name="caption">The caption of the message box</param>
+		/// <param name="message">The body of the message box</param>
 		/// <param name="uType">Define the messagebox type, default is MB_ICON</param>
 		/// <returns>The return value of MessageBoxW, 0 for error</returns>
-		PE_API Int32 InjectMessageBox(Hwnd hWnd, cStringW caption,
-			cStringW message, UInt uType = MB_OK);
+		PE_INLINE Int32 InjectMessageBox(Hwnd hWnd, const std::wstring& caption,
+			const std::wstring& message, UInt uType = MB_OK)
+		{
+			return InjectMessageBox(hWnd, (cStringW)caption.c_str(), (cStringW)message.c_str(), uType);
+		}
 	private:
 		struct hook_t {
 			Bool Active;
@@ -173,7 +202,7 @@ namespace pe
 			Memory, Memory);
 		PE_API Bool InsertHookProcedure(Memory);
 		PE_API Bool RestoreHook(Memory);
-		PE_API Bool FindProcAddressInLibrary(LPCSTR, LPCSTR, Memory);
+		PE_API Bool FindProcAddressInLibrary(cStringA, cStringA, Memory);
 		PE_API void ListLibraries();
 	public:
 		/// <summary>
@@ -307,6 +336,65 @@ namespace pe
 			Handle, cStringW, Dword*);
 		
 		PE_API BOOL InjectDWORDFunction(cStringA, cStringA, Memory, Dword);
+	public:
+		/// <summary>
+		/// Simulates a key press to the pointed process's main window
+		/// </summary>
+		/// <param name="w">The UNICODE character pressed</param>
+		/// <returns>true/false for success/failure</returns>
+		Bool PE_CALL SimulateKeyPress(Wchar w);
+		/// <summary>
+		/// Simulates a key press to the pointed process's main window
+		/// </summary>
+		/// <param name="c">The ANSI character pressed</param>
+		/// <returns>true/false for success/failure</returns>
+		Bool PE_CALL SimulateKeyPress(Char c);
+	private:
+		Bool PE_CALL SimulateKeyPress(cStringW sMessage);
+		Bool PE_CALL SimulateKeyPress(cStringA sMessage);
+		Bool SendSingleKey(Key key, Hwnd = NULL);
+		Bool SendKeyArray(const Key* keys, size_t uCount, Hwnd = NULL);
+	public:
+		/// <summary>
+		/// Simulates a series of key presses and trie to send them to the pointed process's main window
+		/// </summary>
+		/// <param name="sMessage">The ANSI string to send</param>
+		/// <returns>true/false for success/failure</returns>
+		Bool PE_INLINE SimulateKeyPress(const std::string& sMessage)
+		{
+			return SimulateKeyPress((cStringA)sMessage.c_str());
+		}
+		/// <summary>
+		/// Simulates a series of key presses and trie to send them to the pointed process's main window
+		/// </summary>
+		/// <param name="sMessage">The UNICODE string to send</param>
+		/// <returns>true/false for success/failure</returns>
+		Bool PE_INLINE SimulateKeyPress(const std::wstring& sMessage)
+		{
+			return SimulateKeyPress((cStringW)sMessage.c_str());
+		}
+	private:
+		Bool IsLibraryLoaded(cStringA sLibrary)const;
+		Bool IsLibraryLoaded(cStringW sLibrary)const;
+	public:
+		/// <summary>
+		/// Tries to check if the specified library was loaded by the pointed process
+		/// </summary>
+		/// <param name="sLibrary">The library name (ANSI)</param>
+		/// <returns>true if the library was loaded. false otherwise or for error</returns>
+		Bool IsLibraryLoaded(const std::string& sLibrary)const
+		{
+			return IsLibraryLoaded((cStringA)sLibrary.c_str());
+		}
+		/// <summary>
+		/// Tries to check if the specified library was loaded by the pointed process
+		/// </summary>
+		/// <param name="sLibrary">The library name (UNICODE)</param>
+		/// <returns>true if the library was loaded. false otherwise or for error</returns>
+		Bool IsLibraryLoaded(const std::wstring& sLibrary)const
+		{
+			return IsLibraryLoaded((cStringW)sLibrary.c_str());
+		}
 	};
 	/// <summary>
 	/// Finds all the process with this name
@@ -332,7 +420,7 @@ namespace pe
 	/// </summary>
 	/// <param name="dwPID">Process ID (DWORD)</param>
 	/// <returns>The Name (UNICODE), empty string for error</returns>
-	PE_INLINE constexpr String FindProcName(Dword dwPID)
+	PE_INLINE String FindProcName(Dword dwPID)
 	{
 		return FindProcNameW(dwPID);
 	}

@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="PE.h" />
     <ClInclude Include="PE_App.h" />
     <ClInclude Include="PE_App_Struct.h" />
     <ClInclude Include="PE_Definitions.h" />
@@ -157,13 +158,13 @@
     </ClCompile>
     <ClCompile Include="PE_App.cpp" />
     <ClCompile Include="PE_App_Console.cpp" />
-    <ClCompile Include="PE_App_Event.cpp" />
+    <ClCompile Include="PE_App_KeyPress.cpp" />
     <ClCompile Include="PE_App_Hook.cpp" />
-    <ClCompile Include="PE_App_Icon.cpp" />
     <ClCompile Include="PE_App_Inject.cpp" />
     <ClCompile Include="PE_App_Inject_Generic.cpp" />
     <ClCompile Include="PE_App_Libraries.cpp" />
     <ClCompile Include="PE_Strings_ANSI.cpp" />
+    <ClCompile Include="PE_Strings_Conversion.cpp" />
     <ClCompile Include="PE_Strings_UNICODE.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

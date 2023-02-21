@@ -2,7 +2,6 @@
 #include "PE_App.h"
 using namespace pe;
 using namespace pe::Reserved;
-using namespace pe::Reserved;
 
 Bool FreeHook(Reserved::Hook& hook)
 {

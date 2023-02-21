@@ -36,6 +36,9 @@
     <ClInclude Include="PE_Definitions.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
+    <ClInclude Include="PE.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -50,10 +53,7 @@
     <ClCompile Include="PE_App_Console.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
-    <ClCompile Include="PE_App_Event.cpp">
-      <Filter>File di origine</Filter>
-    </ClCompile>
-    <ClCompile Include="PE_App_Icon.cpp">
+    <ClCompile Include="PE_App_KeyPress.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
     <ClCompile Include="PE_App_Inject.cpp">
@@ -72,6 +72,9 @@
       <Filter>File di origine</Filter>
     </ClCompile>
     <ClCompile Include="PE_Strings_UNICODE.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="PE_Strings_Conversion.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
   </ItemGroup>
