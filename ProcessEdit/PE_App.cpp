@@ -5,13 +5,17 @@
 #include <vector>
 using namespace pe;
 
-Bool isValidProgramStr(cStringW& name)
+Bool isValidProgramStr(cStringW name)
 {
 	Int32 indexOfDot = str::LastIndexOfW(name, L'.');
 	if (indexOfDot != EOF)
 	{
 		cStringW _end = str::SinceW(name, indexOfDot);
-		return str::EqualsW(_end, L".exe") || str::EqualsW(_end, L".dll");
+		return 
+			str::EqualsW(_end, L".exe") || str::EqualsW(_end, L".EXE") ||
+			str::EqualsW(_end, L".dll") || str::EqualsW(_end, L".DLL") ||
+			str::EqualsW(_end, L".msi") || str::EqualsW(_end, L".MSI") ||
+			str::EqualsW(_end, L".com") || str::EqualsW(_end, L".COM");
 	}
 	return false;
 }
@@ -46,6 +50,8 @@ App::App()
 	__LastError(0),
 	dispose(true)
 {
+	memset(&_DeleteFileA, 0, sizeof(hook_t));
+	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	this->ListLibraries();
 };
 App::App(cStringW sProcess, Bool canWrite)
@@ -55,6 +61,8 @@ App::App(cStringW sProcess, Bool canWrite)
 	__LastError(0),
 	dispose(true)
 {
+	memset(&_DeleteFileA, 0, sizeof(hook_t));
+	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	if (!isValidProgramStr(sProcess))
 		return;
 	StringW sProcessEdit;
@@ -78,6 +86,8 @@ App::App(Dword PID, Bool canWrite)
 	__LastError(0),
 	dispose(true)
 {
+	memset(&_DeleteFileA, 0, sizeof(hook_t));
+	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	OpenProcessFromID(PID, canWrite);
 	UpdateWindowCount();
 	ListLibraries();
@@ -89,6 +99,8 @@ App::App(const ProcessBasicInfo& pbiInfo, Bool canWrite)
 	__LastError(0),
 	dispose(true)
 {
+	memset(&_DeleteFileA, 0, sizeof(hook_t));
+	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	OpenProcessFromID(pbiInfo.dwId, canWrite);
 	UpdateWindowCount();
 	ListLibraries();
@@ -100,6 +112,8 @@ App::App(const pProcessBasicInfo pPBI, Bool canWrite)
 	__LastError(0),
 	dispose(true)
 {
+	memset(&_DeleteFileA, 0, sizeof(hook_t));
+	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	if (pPBI)
 	{
 		OpenProcessFromID(pPBI->dwId, canWrite);
@@ -116,15 +130,19 @@ App::App(const App& otherApp)
 	__LastError(0),
 	dispose(true)
 {
+	memset(&_DeleteFileA, 0, sizeof(hook_t));
+	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	fromOtherStream(otherApp);
 }
-App::App(App&& otherApp)
+App::App(App&& otherApp) noexcept 
 	:hProc(INVALID_HANDLE_VALUE),
 	hToken(INVALID_HANDLE_VALUE),
 	pId(0),
 	__LastError(0),
 	dispose(true)
 {
+	memset(&_DeleteFileA, 0, sizeof(hook_t));
+	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	fromOtherStream(std::move(otherApp));
 }
 App::~App()
@@ -396,7 +414,7 @@ void App::FindProcessName()
 }
 
 
-App& App::operator = (App&& app)
+App& App::operator = (App&& app) noexcept
 {
 	return fromOtherStream(std::move(app));
 }
@@ -416,9 +434,11 @@ App& App::fromOtherStream(App&& app)
 	str::CopyW(&sUser, app.sUser);
 	__LastError = app.__LastError;
 	str::CopyA(&__LastErrorStr, app.__LastErrorStr);
+	memcpy_s(&_DeleteFileA, sizeof(hook_t), &app._DeleteFileA, sizeof(hook_t));
+	memcpy_s(&_DeleteFileW, sizeof(hook_t), &app._DeleteFileW, sizeof(hook_t));
 	return *this;
 }
-App& App::operator = (const App& app)
+App& App::operator = (const App& app) noexcept
 {
 	return fromOtherStream(app);
 }
@@ -437,6 +457,8 @@ App& App::fromOtherStream(const App& app)
 	str::CopyW(&sUser, app.sUser);
 	__LastError = app.__LastError;
 	str::CopyA(&__LastErrorStr, app.__LastErrorStr);
+	memcpy_s(&_DeleteFileA, sizeof(hook_t), &app._DeleteFileA, sizeof(hook_t));
+	memcpy_s(&_DeleteFileW, sizeof(hook_t), &app._DeleteFileW, sizeof(hook_t));
 	return *this;
 }
 

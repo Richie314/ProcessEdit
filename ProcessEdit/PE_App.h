@@ -77,7 +77,7 @@ namespace pe
 		PE_API App(Dword dwPID, Bool bCanWrite = PE_APP_READWRITE);
 
 		PE_API App(const App& otherProc);
-		PE_API App(App&& otherProc);
+		PE_API App(App&& otherProc) noexcept;
 
 		PE_API App(const ProcessBasicInfo& pbiINFO,
 			Bool bCanWrite = PE_APP_READWRITE);
@@ -90,8 +90,8 @@ namespace pe
 		PE_API void Close();
 
 
-		PE_API App& operator = (App&&);
-		PE_API App& operator = (const App&);
+		PE_API App& operator = (App&&) noexcept;
+		PE_API App& operator = (const App&) noexcept;
 		/// <summary>
 		/// 
 		/// </summary>
@@ -430,7 +430,7 @@ namespace pe
 	/// </summary>
 	/// <param name="dwPID">Process ID (DWORD)</param>
 	/// <returns>The Name (ANSI), empty string for error</returns>
-	PE_INLINE constexpr String FindProcName(Dword dwPID)
+	PE_INLINE String FindProcName(Dword dwPID)
 	{
 		return FindProcNameA(dwPID);
 	}

@@ -52,7 +52,7 @@ namespace pe
 			Memory pNewFunc;
 			Memory pHook;
 			Bool isActive;
-		} Hook, * LPHook;
+		} Hook, *LPHook;
 
 
 		struct BasicStruct 

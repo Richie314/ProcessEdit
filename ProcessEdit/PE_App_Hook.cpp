@@ -46,7 +46,7 @@ Bool App::InternalHook(
 	memcpy(pHook->hook.pOldFunc, pHook->hook.prevJmp, 5U);
 	Dword dwRealFun = (ULONG)pHook->hook.pOldFunc + 5;
 	Dword dwNewFunc = (ULONG)pHook->hook.pNewFunc + 5;
-	*(LPBYTE)((LPBYTE)dwRealFun) = 0xe9Ui8;
+	*((LPBYTE)dwRealFun) = 0xe9Ui8;
 	*(PULONG)((LPBYTE)(dwRealFun + 1U)) = (ULONG)dwNewFunc;
 	return InsertHookProcedure(lpHook);
 }
