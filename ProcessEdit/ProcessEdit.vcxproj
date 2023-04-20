@@ -147,6 +147,7 @@
     <ClInclude Include="PE_Definitions.h" />
     <ClInclude Include="PE_Header.h" />
     <ClInclude Include="PE_Strings.h" />
+    <ClInclude Include="PE_SystemInfo.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -163,9 +164,11 @@
     <ClCompile Include="PE_App_Inject.cpp" />
     <ClCompile Include="PE_App_Inject_Generic.cpp" />
     <ClCompile Include="PE_App_Libraries.cpp" />
+    <ClCompile Include="PE_App_ProcessType.cpp" />
     <ClCompile Include="PE_Strings_ANSI.cpp" />
     <ClCompile Include="PE_Strings_Conversion.cpp" />
     <ClCompile Include="PE_Strings_UNICODE.cpp" />
+    <ClCompile Include="PE_SystemInfo.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

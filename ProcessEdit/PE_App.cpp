@@ -39,27 +39,24 @@ void GetAllWindowsFromProcessID(
 void App::SetLastError(Uint error,
 	 cStringA errorStr)
 {
-	this->__LastError = error;
-	str::CopyA(&this->__LastErrorStr, errorStr);
+	this->LastError = error;
+	str::CopyA(&this->LastErrorStr, errorStr);
 }
 
 App::App()
 	:hProc(INVALID_HANDLE_VALUE),
 	hToken(INVALID_HANDLE_VALUE),
 	pId(0),
-	__LastError(0),
-	dispose(true)
+	LastError(0),
+	dispose(true),
+	Architecture(Unknown),
+	PointerSize(0)
 {
 	memset(&_DeleteFileA, 0, sizeof(hook_t));
 	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	this->ListLibraries();
 };
-App::App(cStringW sProcess, Bool canWrite)
-	:hProc(INVALID_HANDLE_VALUE),
-	hToken(INVALID_HANDLE_VALUE),
-	pId(0),
-	__LastError(0),
-	dispose(true)
+App::App(cStringW sProcess, Bool canWrite) : App()
 {
 	memset(&_DeleteFileA, 0, sizeof(hook_t));
 	memset(&_DeleteFileW, 0, sizeof(hook_t));
@@ -79,12 +76,7 @@ App::App(cStringW sProcess, Bool canWrite)
 	UpdateWindowCount();
 	ListLibraries();
 };
-App::App(Dword PID, Bool canWrite)
-	:hProc(INVALID_HANDLE_VALUE),
-	hToken(INVALID_HANDLE_VALUE),
-	pId(0),
-	__LastError(0),
-	dispose(true)
+App::App(Dword PID, Bool canWrite) : App()
 {
 	memset(&_DeleteFileA, 0, sizeof(hook_t));
 	memset(&_DeleteFileW, 0, sizeof(hook_t));
@@ -92,12 +84,7 @@ App::App(Dword PID, Bool canWrite)
 	UpdateWindowCount();
 	ListLibraries();
 };
-App::App(const ProcessBasicInfo& pbiInfo, Bool canWrite)
-	:hProc(INVALID_HANDLE_VALUE),
-	hToken(INVALID_HANDLE_VALUE),
-	pId(0),
-	__LastError(0),
-	dispose(true)
+App::App(const ProcessBasicInfo& pbiInfo, Bool canWrite) : App()
 {
 	memset(&_DeleteFileA, 0, sizeof(hook_t));
 	memset(&_DeleteFileW, 0, sizeof(hook_t));
@@ -105,12 +92,7 @@ App::App(const ProcessBasicInfo& pbiInfo, Bool canWrite)
 	UpdateWindowCount();
 	ListLibraries();
 };
-App::App(const pProcessBasicInfo pPBI, Bool canWrite)
-	:hProc(INVALID_HANDLE_VALUE),
-	hToken(INVALID_HANDLE_VALUE),
-	pId(0),
-	__LastError(0),
-	dispose(true)
+App::App(const pProcessBasicInfo pPBI, Bool canWrite) : App()
 {
 	memset(&_DeleteFileA, 0, sizeof(hook_t));
 	memset(&_DeleteFileW, 0, sizeof(hook_t));
@@ -123,23 +105,13 @@ App::App(const pProcessBasicInfo pPBI, Bool canWrite)
 		"Trying to initialize with a NULL pointer: expected a \"ProcessBasicInfo\" pointer.");
 	ListLibraries();
 };
-App::App(const App& otherApp)
-	:hProc(INVALID_HANDLE_VALUE),
-	hToken(INVALID_HANDLE_VALUE),
-	pId(0),
-	__LastError(0),
-	dispose(true)
+App::App(const App& otherApp) : App()
 {
 	memset(&_DeleteFileA, 0, sizeof(hook_t));
 	memset(&_DeleteFileW, 0, sizeof(hook_t));
 	fromOtherStream(otherApp);
 }
-App::App(App&& otherApp) noexcept 
-	:hProc(INVALID_HANDLE_VALUE),
-	hToken(INVALID_HANDLE_VALUE),
-	pId(0),
-	__LastError(0),
-	dispose(true)
+App::App(App&& otherApp) noexcept : App()
 {
 	memset(&_DeleteFileA, 0, sizeof(hook_t));
 	memset(&_DeleteFileW, 0, sizeof(hook_t));
@@ -164,9 +136,11 @@ void App::Close()
 	str::FreeW(&sLocation, 0);
 	str::FreeW(&sName, 0);
 	str::FreeW(&sUser, 0);
-	str::FreeA(&__LastErrorStr, 0);
+	str::FreeA(&LastErrorStr, 0);
 	dispose = false;
 	pId = 0;
+	Architecture = Unknown;
+	PointerSize = 0;
 }
 
 Hwnd App::FindThisWindowFromContent(cStringW caption)const
@@ -335,38 +309,50 @@ Dword App::FindProcId()const
 
 void App::OpenStreamProcess(Bool bWrite)
 {
-	if (pId != 0)
+	if (pId == 0)
 	{
-		hProc = OpenProcess(PROCESS_VM_READ |
-			PROCESS_QUERY_INFORMATION | PROCESS_SUSPEND_RESUME |
-			PROCESS_TERMINATE |
-			((bWrite) ? (PROCESS_VM_WRITE | PROCESS_VM_OPERATION) : 0),
-			FALSE, pId);
-		if (HandleBad(hProc))
+		return;
+	}
+	hProc = OpenProcess(PROCESS_VM_READ |
+		PROCESS_QUERY_INFORMATION | PROCESS_SUSPEND_RESUME |
+		PROCESS_TERMINATE |
+		((bWrite) ? (PROCESS_VM_WRITE | PROCESS_VM_OPERATION) : 0),
+		FALSE, pId);
+	if (HandleBad(hProc))
+	{
+		if (GetLastError() == ERROR_ACCESS_DENIED)
 		{
-			if (GetLastError() == ERROR_ACCESS_DENIED)
-			{
-				SetLastError(ERROR_ACCESS_DENIED,
-					"OpenProcess failed with error: ACCESS_DENIED");
-				return;
-			}
+			SetLastError(ERROR_ACCESS_DENIED,
+				"OpenProcess failed with error: ACCESS_DENIED");
+			return;
+		}
+		SetLastError(ERROR_INVALID_HANDLE,
+			"OpenProcess failed returning INVALID_HANDLE_VALUE");
+		return;
+	}
+	BOOL bToken = OpenProcessToken(hProc,
+		TOKEN_READ, &hToken);
+	if (!(bToken && HandleGood(hToken)))
+	{
+		if (GetLastError() == ERROR_ACCESS_DENIED)
+			SetLastError(ERROR_ACCESS_DENIED,
+				"OpenProcessToken failed with error: ACCESS_DENIED");
+		else
 			SetLastError(ERROR_INVALID_HANDLE,
-				"OpenProcess failed returning INVALID_HANDLE_VALUE");
-			return;
-		}
-		BOOL bToken = OpenProcessToken(hProc,
-			TOKEN_READ, &hToken);
-		if (!(bToken && HandleGood(hToken)))
-		{
-			if (GetLastError() == ERROR_ACCESS_DENIED)
-				SetLastError(ERROR_ACCESS_DENIED,
-					"OpenProcessToken failed with error: ACCESS_DENIED");
-			else
-				SetLastError(ERROR_INVALID_HANDLE,
-					"OpenProcessToken returned INVALID_HANDLE_VALUE");
-			return;
-		}
-		ExtractTokenInfo();
+				"OpenProcessToken returned INVALID_HANDLE_VALUE");
+		return;
+	}
+	ExtractTokenInfo();
+	if (!GetProcessType())
+	{
+		Dword lastError = GetLastError();
+		if (lastError == ERROR_ACCESS_DENIED)
+			SetLastError(ERROR_ACCESS_DENIED,
+				"Couldn't detect target platform for process: ACCESS_DENIED");
+		else
+			SetLastError(lastError,
+				"Couldn't detect target platform for process: pe::sys::info variable could be not loaded yet "
+				"or IsWow64Process() could be missing from kernel32.dll");
 	}
 }
 
@@ -432,8 +418,8 @@ App& App::fromOtherStream(App&& app)
 	str::CopyW(&sLocation, app.sLocation);
 	str::CopyW(&sName, app.sName);
 	str::CopyW(&sUser, app.sUser);
-	__LastError = app.__LastError;
-	str::CopyA(&__LastErrorStr, app.__LastErrorStr);
+	LastError = app.LastError;
+	str::CopyA(&LastErrorStr, app.LastErrorStr);
 	memcpy_s(&_DeleteFileA, sizeof(hook_t), &app._DeleteFileA, sizeof(hook_t));
 	memcpy_s(&_DeleteFileW, sizeof(hook_t), &app._DeleteFileW, sizeof(hook_t));
 	return *this;
@@ -455,8 +441,8 @@ App& App::fromOtherStream(const App& app)
 	str::CopyW(&sLocation, app.sLocation);
 	str::CopyW(&sName, app.sName);
 	str::CopyW(&sUser, app.sUser);
-	__LastError = app.__LastError;
-	str::CopyA(&__LastErrorStr, app.__LastErrorStr);
+	LastError = app.LastError;
+	str::CopyA(&LastErrorStr, app.LastErrorStr);
 	memcpy_s(&_DeleteFileA, sizeof(hook_t), &app._DeleteFileA, sizeof(hook_t));
 	memcpy_s(&_DeleteFileW, sizeof(hook_t), &app._DeleteFileW, sizeof(hook_t));
 	return *this;

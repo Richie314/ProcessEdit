@@ -28,7 +28,7 @@ namespace pe
 	typedef tagMSG      Msg, TagMsg;
 	typedef HANDLE      Handle;
 	typedef OVERLAPPED  Overlapped;
-
+	typedef SYSTEM_INFO SysInfo;
 
 	PE_API void	Swap(Memory, Memory, size_t = sizeof(Int32));
 

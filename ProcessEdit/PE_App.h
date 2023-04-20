@@ -26,7 +26,7 @@ namespace pe
 		/// The id of the process
 		/// </summary>
 		Dword dwId;
-	} AppBasicInfo, * LpAppBasicInfo, * pProcessBasicInfo;
+	} AppBasicInfo, *LpAppBasicInfo, *pProcessBasicInfo;
 	using PIDList = List<Dword>;
 	/// <summary>
 	/// Class for interacting win windows process, 
@@ -34,31 +34,60 @@ namespace pe
 	/// </summary>
 	class App
 	{
-	private:
 		Handle hProc, hToken;
 		Dword pId;
+
 		List<Hwnd> hwnds;
+
 		StringW sName;
 		StringW sLocation;
 		StringW sUser;
-		Uint __LastError;
-		StringA __LastErrorStr;
+
 		Bool dispose;
+
+		Uint LastError;
+		StringA LastErrorStr;
 		PE_API void SetLastError(
 			Uint error,
 			cStringA errorStr);
 		List<LoadedLib> LoadedLibraries;
+
 	public:
-		PE_INLINE Uint getLastError()const
+		enum ArchitectureType
 		{
-			return this->__LastError;
-		}
-		PE_INLINE const StringA getLastErrorStr()const
+			Unknown,
+			ARM32,
+			ARM64,
+			x86,
+			x64,
+			WOW64,
+			Intel64,
+			Generic64
+		};
+		PE_API bool Is32Bit()const;
+		PE_API bool Is64Bit()const;
+	private:
+		Uint PointerSize;
+		ArchitectureType Architecture;
+	public:
+		Uint getLastError()const
 		{
-			return this->__LastErrorStr;
+			return this->LastError;
 		}
+
+		Uint getPointerSize()const
+		{
+			return this->PointerSize;
+		}
+
+		const StringA getLastErrorStr()const
+		{
+			return this->LastErrorStr;
+		}
+
 	private:
 		PE_API void OpenStreamProcess(Bool);
+		PE_API Bool GetProcessType();
 		PE_API void UpdateWindowCount();
 		PE_API void OpenProcessFromID(Dword, Bool);
 		PE_API void FindProcessName();
@@ -105,19 +134,22 @@ namespace pe
 
 		PE_API Bool PE_CALL WriteMemory(const Memory addr, const Memory buff, size_t blockSize);
 	private:
+
 		PE_API Hwnd FindThisWindowFromContent(cStringA caption)const;
 		PE_API Hwnd FindThisWindowFromContent(cStringW caption)const;
+
 	public:
-		PE_INLINE Hwnd FindThisWindowFromContent(const std::string& caption)const
+
+		Hwnd FindThisWindowFromContent(const std::string& caption)const
 		{
 			return FindThisWindowFromContent((cStringA)caption.c_str());
 		}
-		PE_INLINE Hwnd FindThisWindowFromContent(const std::wstring& caption)const
+		Hwnd FindThisWindowFromContent(const std::wstring& caption)const
 		{
 			return FindThisWindowFromContent((cStringW)caption.c_str());
 		}
 
-		PE_INLINE Bool Good()const
+		Bool Good()const
 		{
 			return HandleGood(this->hProc) && this->pId != 0;
 		}
@@ -129,18 +161,20 @@ namespace pe
 		PE_API Bool getExitCode(Dword& exitCode);
 
 		PE_API const Handle getProcAddr()const;
+
 		PE_API Handle getProcAddr();
 	private:
 		PE_API Bool InjectDll(cStringA libraryPath);
 		PE_API Bool InjectDll(cStringW libraryPath);
 	public:
+
 		/// <summary>
 		/// Injects a DLL into the running process pointed from this instance
 		/// Note: The current process (not the one pointed) should be running with administrator privileges
 		/// </summary>
 		/// <param name="libraryPath">The path to the library (ANSI)</param>
 		/// <returns>true/false for success/error</returns>
-		PE_INLINE Bool InjectDll(const std::string& libraryPath) 
+		Bool InjectDll(const std::string& libraryPath)
 		{
 			return InjectDll((cStringA)libraryPath.c_str());
 		}
@@ -151,7 +185,7 @@ namespace pe
 		/// </summary>
 		/// <param name="libraryPath">The path to the library (UNICODE)</param>
 		/// <returns>true/false for success/error</returns>
-		PE_INLINE Bool InjectDll(const std::wstring& libraryPath)
+		Bool InjectDll(const std::wstring& libraryPath)
 		{
 			return InjectDll((cStringW)libraryPath.c_str());
 		}
@@ -162,6 +196,7 @@ namespace pe
 		PE_API Int32 InjectMessageBox(Hwnd hWnd, cStringW caption,
 			cStringW message, UInt uType = MB_OK);
 	public:
+
 		/// <summary>
 		/// Forces the Process to call MessageBoxA, you can define the
 		/// parameters and retreive the return value
@@ -171,11 +206,12 @@ namespace pe
 		/// <param name="message">The body of the message box</param>
 		/// <param name="uType">Define the messagebox type, default is MB_ICON</param>
 		/// <returns>The return value of MessageBoxA, 0 for error</returns>
-		PE_INLINE Int32 InjectMessageBox(Hwnd hWnd, const std::string& caption,
+		Int32 InjectMessageBox(Hwnd hWnd, const std::string& caption,
 			const std::string& message, UInt uType = MB_OK)
 		{
 			return InjectMessageBox(hWnd, (cStringA)caption.c_str(), (cStringA)message.c_str(), uType);
 		}
+
 		/// <summary>
 		/// Forces the Process to call MessageBoxW, you can define the
 		/// parameters and retreive the return value
@@ -185,11 +221,12 @@ namespace pe
 		/// <param name="message">The body of the message box</param>
 		/// <param name="uType">Define the messagebox type, default is MB_ICON</param>
 		/// <returns>The return value of MessageBoxW, 0 for error</returns>
-		PE_INLINE Int32 InjectMessageBox(Hwnd hWnd, const std::wstring& caption,
+		Int32 InjectMessageBox(Hwnd hWnd, const std::wstring& caption,
 			const std::wstring& message, UInt uType = MB_OK)
 		{
 			return InjectMessageBox(hWnd, (cStringW)caption.c_str(), (cStringW)message.c_str(), uType);
 		}
+
 	private:
 		struct hook_t {
 			Bool Active;
@@ -204,7 +241,9 @@ namespace pe
 		PE_API Bool RestoreHook(Memory);
 		PE_API Bool FindProcAddressInLibrary(cStringA, cStringA, Memory);
 		PE_API void ListLibraries();
+
 	public:
+
 		/// <summary>
 		/// Redirect the calls to DeleteFileA to the a new function.
 		/// </summary>
@@ -212,6 +251,7 @@ namespace pe
 		/// BOOL (WINAPI*)(LPCSTR)</param>
 		/// <returns>true if the overwriting has worked</returns>
 		PE_API Bool HookDeleteFileA(Reserved::__DeleteFileAProc newFunction);
+
 		/// <summary>
 		/// Redirect the calls to DeleteFileW to the a new function.
 		/// </summary>
@@ -219,19 +259,25 @@ namespace pe
 		/// BOOL (WINAPI*)(LPCWSTR)</param>
 		/// <returns>true if the overwriting has worked</returns>
 		PE_API Bool HookDeleteFileW(Reserved::__DeleteFileWProc newFunction);
+
 		/// <summary>
 		/// Restores the DeleteFileA function to its original memory
 		/// </summary>
 		/// <returns>true if the function is restored correctly</returns>
 		PE_API Bool UnHookDeleteFileA();
+
 		/// <summary>
 		/// Restores the DeleteFileW function to its original memory
 		/// </summary>
 		/// <returns>true if the function is restored correctly</returns>
 		PE_API Bool UnHookDeleteFileW();
+
 	private:
+
 		PE_API Dword FindProcId()const;
+
 	public:
+
 		/// <summary>
 		/// Class for console stream
 		/// </summary>
@@ -243,10 +289,12 @@ namespace pe
 			Bool   bGood;
 			PE_API void UpdateHandle();
 		public:
+
 			/// <summary>
 			/// Default builder, no stream is open
 			/// </summary>
 			PE_API Console_t();
+
 			/// <summary>
 			/// Builds from params
 			/// </summary>
@@ -254,55 +302,65 @@ namespace pe
 			/// <param name="stream">HANDLE to the console stream</param>
 			/// <param name="window">HWND of the console</param>
 			PE_API Console_t(Memory parent, Handle stream, Hwnd window);
+
 			/// <summary>
 			/// Default destroyer, doesn't do nothing particular
 			/// </summary>
 			PE_API ~Console_t();
+
 			/// <summary>
 			/// Tells you if the console exist and is working
 			/// </summary>
 			/// <returns>true if it is impossible to find a console</returns>
 			PE_API Bool Missing()const;
+
 			/// <summary>
 			/// Creates the console if its not present
 			/// </summary>
 			/// <returns>TRUE if the console is created</returns>
 			PE_API BOOL PE_CALL Create();
+
 			/// <summary>
 			/// Creates the console if its not present
 			/// </summary>
 			/// <param name="sTitle">The title of the console</param>
 			/// <returns>TRUE if the console is created and the title is set</returns>
 			PE_API BOOL PE_CALL Create(cStringA sTitle);
+
 			/// <summary>
 			/// Creates the console if its not present
 			/// </summary>
 			/// <param name="sTitle">The title of the console</param>
 			/// <returns>TRUE if the console is created and the title is set</returns>
 			PE_API BOOL PE_CALL Create(cStringW sTitle);
+
 			/// <summary>
 			/// Writes the string to the console
 			/// </summary>
 			/// <param name="sData">The Ansi string to write</param>
 			/// <returns>The return value of WriteConsoleA or FALSE for error</returns>
 			PE_API BOOL PE_CALL Write(cStringA sData);
+
 			/// <summary>
 			/// Writes the string to the console
 			/// </summary>
 			/// <param name="sData">The Unicode string to write</param>
 			/// <returns>The return value of WriteConsoleW or FALSE for error</returns>
 			PE_API BOOL PE_CALL Write(cStringW sData);
+
 			/// <summary>
 			/// Destroys the console window, calls FreeConsole()
 			/// </summary>
 			/// <returns>The value returned by FreeConsole</returns>
 			PE_API BOOL PE_CALL Destroy();
+
 			/// <summary>
 			/// Changes the title of the console
 			/// </summary>
 			/// <param name="sTitle">The title of the console</param>
 			/// <returns>TRUE if the title is set correctly</returns>
 			PE_API BOOL PE_CALL SetTitle(cStringA sTitle);
+
 			/// <summary>
 			/// Changes the title of the console
 			/// </summary>
@@ -316,6 +374,7 @@ namespace pe
 			PE_API void pReserved(Memory, Memory, Memory);
 
 		};
+
 		/// <summary>
 		/// The console of the process
 		/// </summary>
@@ -337,12 +396,14 @@ namespace pe
 		
 		PE_API BOOL InjectDWORDFunction(cStringA, cStringA, Memory, Dword);
 	public:
+
 		/// <summary>
 		/// Simulates a key press to the pointed process's main window
 		/// </summary>
 		/// <param name="w">The UNICODE character pressed</param>
 		/// <returns>true/false for success/failure</returns>
 		Bool PE_CALL SimulateKeyPress(Wchar w);
+
 		/// <summary>
 		/// Simulates a key press to the pointed process's main window
 		/// </summary>
@@ -350,29 +411,34 @@ namespace pe
 		/// <returns>true/false for success/failure</returns>
 		Bool PE_CALL SimulateKeyPress(Char c);
 	private:
+
 		Bool PE_CALL SimulateKeyPress(cStringW sMessage);
 		Bool PE_CALL SimulateKeyPress(cStringA sMessage);
 		Bool SendSingleKey(Key key, Hwnd = NULL);
 		Bool SendKeyArray(const Key* keys, size_t uCount, Hwnd = NULL);
+
 	public:
+
 		/// <summary>
 		/// Simulates a series of key presses and trie to send them to the pointed process's main window
 		/// </summary>
 		/// <param name="sMessage">The ANSI string to send</param>
 		/// <returns>true/false for success/failure</returns>
-		Bool PE_INLINE SimulateKeyPress(const std::string& sMessage)
+		Bool SimulateKeyPress(const std::string& sMessage)
 		{
 			return SimulateKeyPress((cStringA)sMessage.c_str());
 		}
+
 		/// <summary>
 		/// Simulates a series of key presses and trie to send them to the pointed process's main window
 		/// </summary>
 		/// <param name="sMessage">The UNICODE string to send</param>
 		/// <returns>true/false for success/failure</returns>
-		Bool PE_INLINE SimulateKeyPress(const std::wstring& sMessage)
+		Bool SimulateKeyPress(const std::wstring& sMessage)
 		{
 			return SimulateKeyPress((cStringW)sMessage.c_str());
 		}
+
 	private:
 		Bool IsLibraryLoaded(cStringA sLibrary)const;
 		Bool IsLibraryLoaded(cStringW sLibrary)const;
